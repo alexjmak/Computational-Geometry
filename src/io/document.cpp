@@ -36,8 +36,8 @@ std::vector<Point> Document::collectPoints() const {
             points.push_back(segment.end);
         }
         for (const Polygon& polygon : layer.polygons) {
-            for (const Cycle& cycle : polygon.cycles) {
-                points.insert(points.end(), cycle.points.begin(), cycle.points.end());
+            for (const Cycle* cycle : polygon.cycles()) {
+                points.insert(points.end(), cycle->points.begin(), cycle->points.end());
             }
         }
     }
@@ -49,8 +49,8 @@ std::vector<Segment> Document::collectSegments() const {
     for (const Layer& layer : layers) {
         segments.insert(segments.end(), layer.segments.begin(), layer.segments.end());
         for (const Polygon& polygon : layer.polygons) {
-            for (const Cycle& cycle : polygon.cycles) {
-                std::vector<Segment> cycle_segments = cycle.segments();
+            for (const Cycle* cycle : polygon.cycles()) {
+                std::vector<Segment> cycle_segments = cycle->segments();
                 segments.insert(segments.end(), cycle_segments.begin(), cycle_segments.end());
             }
         }

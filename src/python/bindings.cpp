@@ -138,8 +138,10 @@ PYBIND11_MODULE(cgeom, m) {
         .def("__eq__", &Cycle::operator==);
 
     py::class_<Polygon>(m, "Polygon")
-        .def(py::init<std::vector<Cycle>>(), py::arg("cycles"))
-        .def_readwrite("cycles", &Polygon::cycles)
+        .def(py::init<Cycle, std::vector<Cycle>>(), py::arg("outer_cycle"),
+             py::arg("inner_cycles") = std::vector<Cycle>{})
+        .def_readwrite("outer_cycle", &Polygon::outer_cycle)
+        .def_readwrite("inner_cycles", &Polygon::inner_cycles)
         .def("area", &Polygon::area)
         .def("__eq__", &Polygon::operator==);
 

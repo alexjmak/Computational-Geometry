@@ -101,10 +101,8 @@ void Plot::addCycle(const Cycle& cycle, const std::string& face_color,
 
 void Plot::addPolygon(const Polygon& polygon, const std::string& face_color,
                       const std::string& edge_color, double alpha) {
-    // Simplified, assume single cycle
-    if (!polygon.cycles.empty()) {
-        addCycle(polygon.cycles[0], face_color, edge_color, alpha);
-    }
+    // Simplified, draw only the outer cycle.
+    addCycle(polygon.outer_cycle, face_color, edge_color, alpha);
 }
 
 void Plot::setDocument(const Document& document) {

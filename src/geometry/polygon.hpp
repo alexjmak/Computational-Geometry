@@ -36,14 +36,24 @@ class Cycle {
     bool operator==(const Cycle& other) const;
 };
 
-/// \brief Polygon represented by one or more boundary cycles.
+/// \brief Polygon represented by an outer boundary and optional inner hole cycles.
 class Polygon {
   public:
-    std::vector<Cycle> cycles; ///< The boundary cycles that make up the polygon.
+    Cycle outer_cycle; ///< The outer boundary cycle.
+    std::vector<Cycle> inner_cycles; ///< The inner hole boundary cycles.
 
-    /// \brief Initialize a polygon from one or more boundary cycles.
-    /// \param cycles The boundary cycles that make up the polygon.
-    Polygon(std::vector<Cycle> cycles);
+    /// \brief Initialize a polygon from an outer cycle and optional inner cycles.
+    /// \param outer_cycle The outer boundary cycle.
+    /// \param inner_cycles The inner hole boundary cycles.
+    Polygon(Cycle outer_cycle, std::vector<Cycle> inner_cycles = {});
+
+    /// \brief Get pointers to all boundary cycles, with the outer cycle first.
+    /// \returns A vector containing the outer cycle followed by all inner cycles.
+    std::vector<Cycle*> cycles();
+
+    /// \brief Get const pointers to all boundary cycles, with the outer cycle first.
+    /// \returns A vector containing the outer cycle followed by all inner cycles.
+    std::vector<const Cycle*> cycles() const;
 
     /// \brief Compute the signed area contributed by all polygon cycles.
     /// \returns The sum of the signed areas of the polygon's cycles.

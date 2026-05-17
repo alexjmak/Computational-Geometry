@@ -47,7 +47,7 @@ class Plot : public QWidget {
     void addCycle(const Cycle& cycle, const std::string& face_color = "lightblue",
                   const std::string& edge_color = "blue", double alpha = 0.35);
 
-    /// \brief Draw a polygon with one or more cycles, including holes when present.
+    /// \brief Draw the outer cycle of a polygon.
     /// \param polygon The polygon to draw.
     /// \param face_color The fill color.
     /// \param edge_color The boundary color.
@@ -73,8 +73,8 @@ class Plot : public QWidget {
   private:
     /// \brief Filled polygon overlay tracked in data coordinates.
     struct CycleFill {
-        std::vector<Point> points;      ///< The cycle vertices in data coordinates.
-        QGraphicsPolygonItem* item;     ///< The scene item used to render the fill.
+        std::vector<Point> points;  ///< The cycle vertices in data coordinates.
+        QGraphicsPolygonItem* item; ///< The scene item used to render the fill.
     };
 
     /// \brief Expand the tracked plot bounds to include a point.
@@ -87,12 +87,12 @@ class Plot : public QWidget {
     /// \brief Reposition all cycle fill scene items after axes or geometry changes.
     void updateCycleFills();
 
-    QChart* chart;         ///< The Qt chart storing plotted series.
-    QChartView* chartView; ///< The Qt widget used to display the chart.
-    std::optional<double> min_x; ///< The minimum plotted x coordinate.
-    std::optional<double> max_x; ///< The maximum plotted x coordinate.
-    std::optional<double> min_y; ///< The minimum plotted y coordinate.
-    std::optional<double> max_y; ///< The maximum plotted y coordinate.
+    QChart* chart;                      ///< The Qt chart storing plotted series.
+    QChartView* chartView;              ///< The Qt widget used to display the chart.
+    std::optional<double> min_x;        ///< The minimum plotted x coordinate.
+    std::optional<double> max_x;        ///< The maximum plotted x coordinate.
+    std::optional<double> min_y;        ///< The minimum plotted y coordinate.
+    std::optional<double> max_y;        ///< The maximum plotted y coordinate.
     std::vector<CycleFill> cycle_fills; ///< Filled cycle overlays in data coordinates.
 };
 

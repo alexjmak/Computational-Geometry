@@ -92,32 +92,28 @@ Polygon parsePolygon(const YAML::Node& node) {
         throw std::runtime_error("Polygon is missing required 'outer' cycle");
     }
 
-    std::vector<Cycle> cycles;
-    cycles.push_back(parseCycle(node["outer"]));
+    Cycle outer_cycle = parseCycle(node["outer"]);
+    std::vector<Cycle> inner_cycles;
 
     if (node["holes"]) {
         for (const auto& holeNode : node["holes"]) {
-            cycles.push_back(parseCycle(holeNode));
+            inner_cycles.push_back(parseCycle(holeNode));
         }
     }
 
-    return Polygon(std::move(cycles));
+    return Polygon(std::move(outer_cycle), std::move(inner_cycles));
 }
 
 YAML::Node emitPolygon(const Polygon& polygon) {
     YAML::Node node;
 
-    if (polygon.cycles.empty()) {
-        throw std::runtime_error("Cannot save polygon with no cycles");
-    }
+    node["outer"] = emitCycle(polygon.outer_cycle);
 
-    node["outer"] = emitCycle(polygon.cycles[0]);
-
-    if (polygon.cycles.size() > 1) {
+    if (!polygon.inner_cycles.empty()) {
         YAML::Node holes;
 
-        for (size_t i = 1; i < polygon.cycles.size(); ++i) {
-            holes.push_back(emitCycle(polygon.cycles[i]));
+        for (const Cycle& inner_cycle : polygon.inner_cycles) {
+            holes.push_back(emitCycle(inner_cycle));
         }
 
         node["holes"] = holes;

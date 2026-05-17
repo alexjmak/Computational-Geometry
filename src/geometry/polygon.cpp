@@ -1,6 +1,7 @@
 #include "geometry/polygon.hpp"
 #include "geometry/predicates.hpp"
 #include <cmath>
+#include <stdexcept>
 
 Cycle::Cycle(std::vector<Point> points) : points(points) {}
 
@@ -39,18 +40,52 @@ bool Cycle::operator==(const Cycle& other) const {
     return points == other.points;
 }
 
-Polygon::Polygon(std::vector<Cycle> cycles) : cycles(cycles) {}
+Polygon::Polygon(Cycle outer_cycle, std::vector<Cycle> inner_cycles)
+    : outer_cycle(outer_cycle), inner_cycles(inner_cycles) {
+    if (!this->outer_cycle.isOuter()) {
+        throw std::invalid_argument("Polygon outer cycle must be counter-clockwise");
+    }
+    for (const Cycle& inner_cycle : this->inner_cycles) {
+        if (inner_cycle.isOuter()) {
+            throw std::invalid_argument("Polygon inner cycles must be clockwise");
+        }
+    }
+}
+
+std::vector<Cycle*> Polygon::cycles() {
+    std::vector<const Cycle*> const_cycles = static_cast<const Polygon&>(*this).cycles();
+    std::vector<Cycle*> ret;
+    ret.reserve(const_cycles.size());
+
+    for (const Cycle* cycle : const_cycles) {
+        ret.push_back(const_cast<Cycle*>(cycle));
+    }
+
+    return ret;
+}
+
+std::vector<const Cycle*> Polygon::cycles() const {
+    std::vector<const Cycle*> ret;
+    ret.reserve(1 + inner_cycles.size());
+
+    ret.push_back(&outer_cycle);
+    for (const Cycle& inner_cycle : inner_cycles) {
+        ret.push_back(&inner_cycle);
+    }
+
+    return ret;
+}
 
 double Polygon::area() const {
-    double ret = 0.0;
-    for (const auto& cycle : cycles) {
-        ret += cycle.signedArea();
+    double ret = outer_cycle.signedArea();
+    for (const Cycle& inner_cycle : inner_cycles) {
+        ret += inner_cycle.signedArea();
     }
     return ret;
 }
 
 bool Polygon::operator==(const Polygon& other) const {
-    return cycles == other.cycles;
+    return outer_cycle == other.outer_cycle && inner_cycles == other.inner_cycles;
 }
 
 Rectangle::Rectangle(Point lower_left, Point upper_right)
@@ -63,7 +98,7 @@ Cycle Rectangle::cycle() const {
 }
 
 Polygon Rectangle::polygon() const {
-    return Polygon({cycle()});
+    return Polygon(cycle());
 }
 
 bool Rectangle::contains(const Point& p) const {
@@ -76,8 +111,13 @@ bool Rectangle::contains(const Segment& s) const {
 }
 
 bool Rectangle::contains(const Polygon& polygon) const {
-    for (const Cycle& cycle : polygon.cycles) {
-        for (const Point& point : cycle.points) {
+    for (const Point& point : polygon.outer_cycle.points) {
+        if (!contains(point)) {
+            return false;
+        }
+    }
+    for (const Cycle& inner_cycle : polygon.inner_cycles) {
+        for (const Point& point : inner_cycle.points) {
             if (!contains(point)) {
                 return false;
             }

@@ -105,7 +105,7 @@ class ConvexHullOperation : public Operation {
 
         Layer output_layer;
         output_layer.name = "convex_hull";
-        output_layer.polygons.push_back(Polygon({convexHull(points)}));
+        output_layer.polygons.push_back(Polygon(convexHull(points)));
         document.layers.push_back(std::move(output_layer));
 
         saveYaml(document, output_path);
