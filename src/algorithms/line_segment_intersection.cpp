@@ -5,6 +5,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <stdexcept>
 
 namespace sweep {
 
@@ -44,8 +45,7 @@ class ActiveSegment {
     State* line_sweep;               ///< The owning sweep-line state.
     Rational slope_inverse;          ///< The finite inverse slope used for tie-breaking.
     int slope_inverse_infinity;      ///< Direction marker for horizontal segment ordering.
-    mutable Rational cached_event_x; ///< The x coordinate of the cached event point.
-    mutable Rational cached_event_y; ///< The y coordinate of the cached event point.
+    mutable std::optional<Point> cached_event; ///< The event point for the cached intersection.
     mutable std::optional<Point> cached_point_at_event; ///< Cached intersection at curr_event.
 
     /// \brief Wrap a segment with sweep-specific cached data.
@@ -164,7 +164,7 @@ void State::printElement(const ActiveSegment& key) {
 
 ActiveSegment::ActiveSegment(const Segment& segment, State* line_sweep)
     : segment(segment), line_sweep(line_sweep), slope_inverse(0), slope_inverse_infinity(0),
-      cached_event_x(0), cached_event_y(0) {
+      cached_event(), cached_point_at_event() {
     Rational dx = segment.start.x - segment.end.x;
     Rational dy = segment.start.y - segment.end.y;
     if (dy != 0) {
@@ -177,12 +177,11 @@ ActiveSegment::ActiveSegment(const Segment& segment, State* line_sweep)
 
 std::optional<Point> ActiveSegment::pointAtCurrEvent() const {
     const Point& event_point = line_sweep->curr_event.point;
-    if (cached_event_x == event_point.x && cached_event_y == event_point.y) {
+    if (cached_event && *cached_event == event_point) {
         return cached_point_at_event;
     }
     auto point_at_y = intersectAtY(segment, event_point);
-    cached_event_x = event_point.x;
-    cached_event_y = event_point.y;
+    cached_event = event_point;
     cached_point_at_event = point_at_y;
     return point_at_y;
 }
@@ -197,7 +196,8 @@ bool ActiveSegmentCompare::operator()(const ActiveSegment& a, const ActiveSegmen
     const Point& event_point = a.line_sweep->curr_event.point;
 
     if (!point_at_y || !other_point_at_y) {
-        throw std::runtime_error("AssertionError");
+        throw std::runtime_error(
+            "Failed to compute intersection point for active segment comparison");
     }
 
     if (*point_at_y == *other_point_at_y) {
