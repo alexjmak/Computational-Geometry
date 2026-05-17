@@ -185,6 +185,80 @@ add_custom_target(
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/cgeom.pyi
 )
 
+include(GoogleTest)
+
+add_executable(
+    geometry_tests
+    tests/geometry_tests.cpp
+)
+
+set_target_properties(
+    geometry_tests
+    PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tests
+)
+
+target_link_libraries(
+    geometry_tests
+    PRIVATE
+    geometry_core
+    GTest::gtest_main
+)
+
+gtest_discover_tests(geometry_tests)
+
+add_executable(
+    algorithm_tests
+    tests/algorithm_tests.cpp
+)
+
+set_target_properties(
+    algorithm_tests
+    PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tests
+)
+
+target_link_libraries(
+    algorithm_tests
+    PRIVATE
+    geometry_core
+    GTest::gtest_main
+)
+
+gtest_discover_tests(algorithm_tests)
+
+add_executable(
+    gui_tests
+    tests/gui_tests.cpp
+)
+
+set_target_properties(
+    gui_tests
+    PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tests
+)
+
+target_link_libraries(
+    gui_tests
+    PRIVATE
+    gui_core
+    GTest::gtest
+)
+
+gtest_discover_tests(
+    gui_tests
+    PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
+add_custom_target(
+    tests
+    DEPENDS
+    geometry_tests
+    algorithm_tests
+    gui_tests
+)
+
 if(DOXYGEN_FOUND)
     add_custom_target(
         docs
