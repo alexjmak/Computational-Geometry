@@ -15,15 +15,19 @@ bool Segment::isCanonicalizedY() const {
 
 Segment Segment::canonicalizedX() const {
     if (isCanonicalizedX()) {
-        return Segment(start, end);
+        return *this;
     }
-    return Segment(end, start);
+    return reversed();
 }
 
 Segment Segment::canonicalizedY() const {
     if (isCanonicalizedY()) {
-        return Segment(start, end);
+        return *this;
     }
+    return reversed();
+}
+
+Segment Segment::reversed() const {
     return Segment(end, start);
 }
 

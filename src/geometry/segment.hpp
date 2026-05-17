@@ -31,6 +31,10 @@ class Segment {
     /// \returns A segment with endpoints ordered by y, with horizontal ties right-to-left.
     Segment canonicalizedY() const;
 
+    /// \brief Return a copy of the segment with reversed direction.
+    /// \returns A segment with start and end endpoints swapped.
+    Segment reversed() const;
+
     /// \brief Check whether two directed segments have equal endpoints.
     /// \param other The segment to compare against.
     /// \returns True if both start and end endpoints are equal.
