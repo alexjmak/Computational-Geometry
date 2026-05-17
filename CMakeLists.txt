@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(FetchContent)
+include(CTest)
 
 find_package(Boost CONFIG REQUIRED)
 find_package(Qt6 REQUIRED COMPONENTS Widgets Charts Concurrent)
@@ -31,7 +32,13 @@ FetchContent_Declare(
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 
-FetchContent_MakeAvailable(pybind11 yaml-cpp)
+FetchContent_Declare(
+    googletest
+    URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.tar.gz
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+
+FetchContent_MakeAvailable(pybind11 yaml-cpp googletest)
 
 if(TARGET yaml-cpp AND NOT TARGET yaml-cpp::yaml-cpp)
     add_library(yaml-cpp::yaml-cpp ALIAS yaml-cpp)
@@ -82,6 +89,37 @@ set_target_properties(
     POSITION_INDEPENDENT_CODE ON
 )
 
+add_library(
+    gui_core
+    STATIC
+    src/gui/controller.cpp
+    src/gui/plot.cpp
+)
+
+target_include_directories(
+    gui_core
+    PUBLIC
+    ${CMAKE_SOURCE_DIR}/src
+    ${Qt6Widgets_INCLUDE_DIRS}
+    ${Qt6Charts_INCLUDE_DIRS}
+    ${Qt6Core_INCLUDE_DIRS}
+)
+
+target_link_libraries(
+    gui_core
+    PUBLIC
+    geometry_core
+    Qt6::Widgets
+    Qt6::Charts
+    Qt6::Concurrent
+)
+
+set_target_properties(
+    gui_core
+    PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)
+
 add_executable(
     cgeom
     src/cli/main.cpp
@@ -98,22 +136,21 @@ target_link_libraries(
 add_executable(
     cgeom-gui
     src/gui/main.cpp
-    src/gui/controller.cpp
-    src/gui/plot.cpp
 )
 
 target_link_libraries(
     cgeom-gui
     PRIVATE
-    geometry_core
-    Qt6::Widgets
-    Qt6::Charts
-    Qt6::Concurrent
+    gui_core
 )
 
 pybind11_add_module(
     cgeom_python
     src/python/bindings.cpp
+    src/python/geometry_bindings.cpp
+    src/python/document_bindings.cpp
+    src/python/gui_bindings.cpp
+    src/python/algorithm_bindings.cpp
 )
 
 set_target_properties(
@@ -126,6 +163,7 @@ target_link_libraries(
     cgeom_python
     PRIVATE
     geometry_core
+    gui_core
 )
 
 if(DOXYGEN_FOUND)
