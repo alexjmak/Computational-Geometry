@@ -47,7 +47,11 @@ endif()
 find_program(CLANG_TIDY_EXE clang-tidy
     PATHS /usr/local/opt/llvm/bin
 )
-set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_EXE} --extra-arg=-isystem${Boost_INCLUDE_DIRS})
+set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_EXE})
+
+if(APPLE)
+    list(APPEND CMAKE_CXX_CLANG_TIDY --extra-arg=-isystem${Boost_INCLUDE_DIRS})
+endif()
 
 add_library(
     geometry_core
