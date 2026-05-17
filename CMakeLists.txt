@@ -166,6 +166,25 @@ target_link_libraries(
     gui_core
 )
 
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/cgeom.pyi
+    COMMAND ${CMAKE_COMMAND} -E env
+            PYTHONPATH=$<TARGET_FILE_DIR:cgeom_python>
+            pybind11-stubgen
+            cgeom
+            -o ${CMAKE_CURRENT_BINARY_DIR}
+    DEPENDS cgeom_python
+    COMMENT "Generating Python type hints for cgeom"
+    VERBATIM
+)
+
+add_custom_target(
+    copy_cgeom_pyi ALL
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/cgeom.pyi
+)
+
 if(DOXYGEN_FOUND)
     add_custom_target(
         docs
