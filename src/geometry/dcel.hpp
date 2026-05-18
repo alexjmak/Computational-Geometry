@@ -6,6 +6,7 @@
 #include "geometry/vector.hpp"
 #include <cstddef>
 #include <limits>
+#include <optional>
 #include <vector>
 
 class DCEL {
@@ -15,7 +16,6 @@ class DCEL {
     /// \brief Face index reserved for the unbounded face.
     static constexpr std::size_t unbounded_face_index = 0;
 
-    DCEL() = default;
     DCEL(const DCEL&) = delete;
     DCEL& operator=(const DCEL&) = delete;
     DCEL(DCEL&&) noexcept = default;
@@ -122,10 +122,49 @@ class DCEL {
     /// \returns The segment from the half-edge origin to its twin's origin.
     Segment segmentOf(const HalfEdge& half_edge) const;
 
+    /// \brief Convert a half-edge cycle into a geometric cycle.
+    /// \param half_edge The half-edge whose cycle should be converted.
+    /// \returns A cycle containing the vertices of the half-edge cycle.
+    Cycle cycleOf(const HalfEdge& half_edge) const;
+
+    /// \brief Convert a face into a polygon by converting its outer and inner cycles.
+    /// \param face The face to convert.
+    /// \returns A polygon with an outer cycle from the face's outer component and inner cycles
+    /// from the face's inner components. The unbounded face returns std::nullopt.
+    std::optional<Polygon> polygonOf(const Face& face) const;
+
+    /// \brief Access the reserved unbounded face.
+    /// \returns The face at DCEL::unbounded_face_index.
+    const Face& unboundedFace() const;
+
+    /// \brief Compute nesting depths for all faces using the unbounded face as depth zero.
+    /// \returns A face-indexed depth vector; unreachable faces keep DCEL::npos.
+    std::vector<std::size_t> faceDepths() const;
+
     /// \brief Build a DCEL from polygon boundary cycles.
     /// \param polygons The polygons whose boundaries should populate the DCEL.
     /// \returns A DCEL containing vertices, half-edges, and faces for the polygons.
     static DCEL fromPolygons(const std::vector<Polygon>& polygons);
+
+    /// \brief Build a DCEL from boundary cycles.
+    /// \param cycles The boundary cycles to populate the DCEL.
+    /// \returns A DCEL containing vertices, half-edges, and faces for the cycles.
+    static DCEL fromCycles(const std::vector<const Cycle*>& cycles);
+
+    /// \brief Build a DCEL from boundary cycles.
+    /// \param cycles The boundary cycles to populate the DCEL.
+    /// \returns A DCEL containing vertices, half-edges, and faces for the cycles.
+    static DCEL fromCycles(const std::vector<Cycle>& cycles);
+
+    /// \brief Build a DCEL from segments by assembling them into cycles.
+    /// \param segments The segments to populate the DCEL.
+    /// \returns A DCEL containing vertices, half-edges, and faces for the segments.
+    static DCEL fromSegments(const std::vector<Segment>& segments);
+
+  private:
+    // External code cannot create an empty/unbuilt DCEL.
+    // Only the static DCEL factory methods can create one.
+    DCEL() = default;
 };
 
 #endif // DCEL_HPP

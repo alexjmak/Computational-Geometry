@@ -1,3 +1,4 @@
+#include "algorithms/assemble.hpp"
 #include "algorithms/convex_hull.hpp"
 #include "algorithms/line_segment_intersection.hpp"
 #include "geometry/random.hpp"
@@ -53,14 +54,14 @@ std::vector<Segment> randomSegmentsPython(int count, std::optional<unsigned int>
 } // namespace
 
 void bindAlgorithms(py::module_& module) {
+    module.def("assemble_cycles", &assembleCycles, py::arg("segments"));
+    module.def("assemble_polygons", &assemblePolygons, py::arg("segments"));
     module.def("convex_hull", &convexHull, py::arg("points"));
     module.def("line_segment_intersection", &lineSegmentIntersectionPython, py::arg("segments"),
                py::arg("algorithm") = "line-sweep");
-    module.def("random_points", &randomPointsPython, py::arg("count"),
-               py::arg("seed") = py::none(), py::arg("min_coord") = 10,
-               py::arg("max_coord") = 100);
+    module.def("random_points", &randomPointsPython, py::arg("count"), py::arg("seed") = py::none(),
+               py::arg("min_coord") = 10, py::arg("max_coord") = 100);
     module.def("random_segments", &randomSegmentsPython, py::arg("count"),
-               py::arg("seed") = py::none(), py::arg("min_length") = 1,
-               py::arg("max_length") = 40, py::arg("min_coord") = 1,
-               py::arg("max_coord") = 1000);
+               py::arg("seed") = py::none(), py::arg("min_length") = 1, py::arg("max_length") = 40,
+               py::arg("min_coord") = 1, py::arg("max_coord") = 1000);
 }

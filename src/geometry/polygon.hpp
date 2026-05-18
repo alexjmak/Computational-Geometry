@@ -13,6 +13,10 @@ class Cycle {
     /// \param points The points that define the closed cycle boundary.
     Cycle(std::vector<Point> points);
 
+    /// \brief Reverse the point order of the cycle. This changes the cycle orientation and negates
+    /// the signed area so outer cycles become inner and vice versa.
+    void reverse();
+
     /// \brief Compute the signed area of the cycle.
     /// \returns The signed area. Positive values indicate counter-clockwise point order,
     /// and negative values indicate clockwise point order.
@@ -39,7 +43,7 @@ class Cycle {
 /// \brief Polygon represented by an outer boundary and optional inner hole cycles.
 class Polygon {
   public:
-    Cycle outer_cycle; ///< The outer boundary cycle.
+    Cycle outer_cycle;               ///< The outer boundary cycle.
     std::vector<Cycle> inner_cycles; ///< The inner hole boundary cycles.
 
     /// \brief Initialize a polygon from an outer cycle and optional inner cycles.

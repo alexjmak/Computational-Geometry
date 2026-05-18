@@ -1,3 +1,4 @@
+#include "algorithms/assemble.hpp"
 #include "algorithms/convex_hull.hpp"
 #include "algorithms/line_segment_intersection.hpp"
 #include "geometry/polygon.hpp"
@@ -77,6 +78,57 @@ TEST(ConvexHullTest, SlowAndFastHullUseSameBoundaryPoints) {
     }
 
     EXPECT_EQ(pointSet(hull.points), pointSet(slow_points));
+}
+
+TEST(AssembleCyclesTest, BuildsOuterCycleFromUnorderedSegments) {
+    const std::vector<Segment> segments = {
+        Segment(Point(1, 0), Point(1, 1)),
+        Segment(Point(0, 1), Point(0, 0)),
+        Segment(Point(1, 1), Point(0, 1)),
+        Segment(Point(0, 0), Point(1, 0)),
+    };
+
+    const std::vector<Cycle> cycles = assembleCycles(segments);
+
+    ASSERT_EQ(cycles.size(), 1);
+    EXPECT_TRUE(cycles[0].isOuter());
+    EXPECT_DOUBLE_EQ(cycles[0].area(), 1.0);
+    EXPECT_EQ(pointSet(cycles[0].points),
+              pointSet({Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1)}));
+}
+
+TEST(AssembleCyclesTest, BuildsMultipleDisjointOuterCycles) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(1, 0)), Segment(Point(1, 0), Point(1, 1)),
+        Segment(Point(1, 1), Point(0, 1)), Segment(Point(0, 1), Point(0, 0)),
+        Segment(Point(3, 0), Point(5, 0)), Segment(Point(5, 0), Point(5, 2)),
+        Segment(Point(5, 2), Point(3, 2)), Segment(Point(3, 2), Point(3, 0)),
+    };
+
+    const std::vector<Cycle> cycles = assembleCycles(segments);
+
+    ASSERT_EQ(cycles.size(), 2);
+    EXPECT_TRUE(cycles[0].isOuter());
+    EXPECT_TRUE(cycles[1].isOuter());
+    EXPECT_DOUBLE_EQ(cycles[0].area() + cycles[1].area(), 5.0);
+}
+
+TEST(AssembleCyclesTest, RejectsDuplicateReversedAndDegenerateSegments) {
+    EXPECT_THROW(
+        assembleCycles({Segment(Point(0, 0), Point(1, 0)), Segment(Point(1, 0), Point(0, 0))}),
+        std::invalid_argument);
+
+    EXPECT_THROW(assembleCycles({Segment(Point(0, 0), Point(0, 0))}), std::invalid_argument);
+}
+
+TEST(AssembleCyclesTest, RejectsOpenChains) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(1, 0)),
+        Segment(Point(1, 0), Point(1, 1)),
+        Segment(Point(1, 1), Point(0, 1)),
+    };
+
+    EXPECT_THROW(assembleCycles(segments), std::invalid_argument);
 }
 
 TEST(LineSegmentIntersectionTest, FindsSingleCrossingPoint) {

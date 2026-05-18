@@ -3,7 +3,7 @@
 #include <cmath>
 #include <stdexcept>
 
-Cycle::Cycle(std::vector<Point> points) : points(points) {}
+Cycle::Cycle(std::vector<Point> points) : points(std::move(points)) {}
 
 double Cycle::signedArea() const {
     if (points.size() < 3) {
@@ -38,6 +38,10 @@ std::vector<Segment> Cycle::segments() const {
 
 bool Cycle::operator==(const Cycle& other) const {
     return points == other.points;
+}
+
+void Cycle::reverse() {
+    std::reverse(points.begin(), points.end());
 }
 
 Polygon::Polygon(Cycle outer_cycle, std::vector<Cycle> inner_cycles)

@@ -1,10 +1,12 @@
 #include "geometry/dcel.hpp"
+#include "algorithms/assemble.hpp"
 #include "geometry/intersection.hpp"
 #include "geometry/polygon.hpp"
 #include "geometry/predicates.hpp"
 #include <cassert>
 #include <cstddef>
 #include <optional>
+#include <queue>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -79,10 +81,14 @@ struct DCELBoundaryCycle {
 /// \brief Incremental builder for constructing a DCEL from polygon boundaries.
 class DCELCreator {
   public:
+    /// \brief Initialize a builder around an empty DCEL supplied by a factory.
+    /// \param dcel The empty DCEL to populate.
+    explicit DCELCreator(DCEL dcel);
+
     /// \brief Build a DCEL from polygon boundary cycles.
-    /// \param polygons The polygons whose boundary cycles should be inserted.
+    /// \param cycles The cycles whose boundaries should be inserted.
     /// \returns A populated DCEL.
-    DCEL build(const std::vector<Polygon>& polygons);
+    DCEL build(const std::vector<const Cycle*>& cycles);
 
   private:
     DCEL dcel;                                        ///< DCEL being incrementally constructed.
@@ -94,7 +100,7 @@ class DCELCreator {
 
     /// \brief Reserve storage for vertices and half-edges.
     /// \param polygons The polygons that will be inserted.
-    void reserve(const std::vector<Polygon>& polygons);
+    void reserve(const std::vector<const Cycle*>& cycles);
 
     /// \brief Add a polygon boundary cycle and its twin boundary cycle.
     /// \param cycle The input boundary cycle to add.
@@ -124,6 +130,11 @@ class DCELCreator {
     /// \param boundary_cycle The boundary cycle metadata to attach.
     /// \param face_index The face receiving the boundary component.
     void addBoundaryCycleToFace(const DCELBoundaryCycle& boundary_cycle, std::size_t face_index);
+
+    /// \brief Assign a face index to every half-edge in a boundary cycle.
+    /// \param boundary_cycle The boundary cycle whose half-edges should be assigned.
+    /// \param face_index The face incident to the boundary cycle.
+    void assignFaceToBoundaryCycle(const DCELBoundaryCycle& boundary_cycle, std::size_t face_index);
 
     /// \brief Link the next/previous pointers for a directed cycle and its twin cycle.
     /// \param half_edge_indices Ordered half-edge indices for the directed cycle.
@@ -159,13 +170,13 @@ class DCELCreator {
     std::size_t createHalfEdge(const Segment& segment);
 };
 
-DCEL DCELCreator::build(const std::vector<Polygon>& polygons) {
-    reserve(polygons);
+DCELCreator::DCELCreator(DCEL dcel) : dcel(std::move(dcel)) {}
 
-    for (const Polygon& polygon : polygons) {
-        for (const Cycle* cycle : polygon.cycles()) {
-            addCycle(*cycle);
-        }
+DCEL DCELCreator::build(const std::vector<const Cycle*>& cycles) {
+    reserve(cycles);
+
+    for (const Cycle* cycle : cycles) {
+        addCycle(*cycle);
     }
 
     createFaces();
@@ -281,6 +292,11 @@ DCELCreator::getOrCreateFace(const std::size_t root_cycle_index,
 
 void DCELCreator::addBoundaryCycleToFace(const DCELBoundaryCycle& boundary_cycle,
                                          const std::size_t face_index) {
+
+    // Assign this face to every half-edge around the boundary component.
+    assignFaceToBoundaryCycle(boundary_cycle, face_index);
+
+    // Store one representative half-edge for this boundary component.
     const std::size_t half_edge_index = boundary_cycle.leftmost_half_edge;
     if (boundary_cycle.is_outer) {
         assert(dcel.faces[face_index].outer_component == DCEL::npos);
@@ -290,14 +306,27 @@ void DCELCreator::addBoundaryCycleToFace(const DCELBoundaryCycle& boundary_cycle
     }
 }
 
-void DCELCreator::reserve(const std::vector<Polygon>& polygons) {
+void DCELCreator::assignFaceToBoundaryCycle(const DCELBoundaryCycle& boundary_cycle,
+                                            const std::size_t face_index) {
+    const std::size_t start = boundary_cycle.leftmost_half_edge;
+    std::size_t current = start;
+    for (std::size_t i = 0; i < dcel.half_edges.size(); ++i) {
+        dcel.half_edges[current].face = face_index;
+        current = dcel.half_edges[current].next;
+        if (current == start) {
+            return;
+        }
+    }
+
+    assert(false && "Boundary cycle does not close while assigning face");
+}
+
+void DCELCreator::reserve(const std::vector<const Cycle*>& cycles) {
     std::size_t segment_count = 0;
     std::size_t cycle_count = 0;
-    for (const Polygon& polygon : polygons) {
-        for (const Cycle* cycle : polygon.cycles()) {
-            segment_count += cycle->points.size();
-            cycle_count++;
-        }
+    for (const Cycle* cycle : cycles) {
+        segment_count += cycle->points.size();
+        cycle_count++;
     }
 
     dcel.points.reserve(segment_count * 2);
@@ -490,6 +519,101 @@ Segment DCEL::segmentOf(const DCEL::HalfEdge& half_edge) const {
     return Segment(originOf(half_edge), originOf(twinOf(half_edge)));
 }
 
+Cycle DCEL::cycleOf(const HalfEdge& half_edge) const {
+    std::vector<Point> points;
+    const HalfEdge* current_half_edge = &half_edge;
+    do {
+        points.push_back(originOf(*current_half_edge));
+        current_half_edge = &nextOf(*current_half_edge);
+    } while (current_half_edge != &half_edge);
+    return Cycle(std::move(points));
+}
+
+std::optional<Polygon> DCEL::polygonOf(const Face& face) const {
+    if (face.outer_component == npos) {
+        // Unbounded face is not a finite polygon, so forcing it into Polygon would be semantically
+        // wrong.
+        return std::nullopt;
+    }
+
+    const HalfEdge& outer_half_edge = half_edges[face.outer_component];
+    Cycle outer_cycle = cycleOf(outer_half_edge);
+
+    std::vector<Cycle> inner_cycles;
+    for (const std::size_t inner_component : face.inner_components) {
+        const HalfEdge& inner_half_edge = half_edges[inner_component];
+        inner_cycles.push_back(cycleOf(inner_half_edge));
+    }
+
+    return Polygon(std::move(outer_cycle), std::move(inner_cycles));
+}
+
 DCEL DCEL::fromPolygons(const std::vector<Polygon>& polygons) {
-    return DCELCreator().build(polygons);
+    std::vector<const Cycle*> cycles;
+    for (const Polygon& polygon : polygons) {
+        for (const Cycle* cycle : polygon.cycles()) {
+            cycles.push_back(cycle);
+        }
+    }
+    return DCELCreator(DCEL()).build(cycles);
+}
+
+DCEL DCEL::fromCycles(const std::vector<const Cycle*>& cycles) {
+    return DCELCreator(DCEL()).build(cycles);
+}
+
+DCEL DCEL::fromCycles(const std::vector<Cycle>& cycles) {
+    std::vector<const Cycle*> cycle_pointers;
+    for (const Cycle& cycle : cycles) {
+        cycle_pointers.push_back(&cycle);
+    }
+    return DCELCreator(DCEL()).build(cycle_pointers);
+}
+
+DCEL DCEL::fromSegments(const std::vector<Segment>& segments) {
+    std::vector<const Cycle*> cycles;
+    std::vector<Cycle> assembled_cycles = assembleCycles(segments);
+    for (const Cycle& cycle : assembled_cycles) {
+        cycles.push_back(&cycle);
+    }
+    return DCELCreator(DCEL()).build(cycles);
+}
+
+const DCEL::Face& DCEL::unboundedFace() const {
+    return faces[unbounded_face_index];
+}
+
+std::vector<std::size_t> DCEL::faceDepths() const {
+    std::size_t depth = 0;
+    std::vector<std::size_t> face_depths(faces.size(), DCEL::npos);
+    face_depths[unbounded_face_index] = depth;
+
+    std::queue<std::size_t> queue;
+    queue.push(unbounded_face_index);
+
+    while (!queue.empty()) {
+        std::size_t count = queue.size();
+        for (std::size_t i = 0; i < count; i++) {
+            std::size_t face_index = queue.front();
+            queue.pop();
+
+            const Face& face = faces[face_index];
+            for (std::size_t inner_component : face.inner_components) {
+                const HalfEdge& half_edge = half_edges[inner_component];
+                const HalfEdge& twin_half_edge = twinOf(half_edge);
+                const std::size_t next_face = twin_half_edge.face;
+                assert(next_face != npos);
+
+                if (face_depths[next_face] != npos) {
+                    continue;
+                }
+
+                face_depths[next_face] = depth + 1;
+                queue.push(next_face);
+            }
+        }
+        ++depth;
+    }
+
+    return face_depths;
 }

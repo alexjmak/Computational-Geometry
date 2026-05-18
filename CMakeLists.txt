@@ -63,6 +63,7 @@ add_library(
     src/geometry/intersection.cpp
     src/geometry/random.cpp
     src/geometry/dcel.cpp
+    src/algorithms/assemble.cpp
     src/algorithms/convex_hull.cpp
     src/algorithms/line_segment_intersection.cpp
     src/io/document.cpp
