@@ -32,4 +32,11 @@ std::optional<Point> intersectionPoint(const Segment& s, const Segment& t);
 /// \returns The intersection point when the segment spans p.y, otherwise std::nullopt.
 std::optional<Point> intersectAtY(const Segment& s, const Point& p);
 
+/// \brief Intersect a segment with the horizontal ray to the left of a point.
+/// \param s The segment to intersect.
+/// \param p A point whose y coordinate defines the horizontal ray.
+/// \returns The intersection point when the segment spans p.y and the intersection is to the left
+/// of p, otherwise std::nullopt.
+std::optional<Point> leftRayIntersection(const Segment& s, const Point& p);
+
 #endif // INTERSECTION_HPP

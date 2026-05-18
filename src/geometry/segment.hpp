@@ -19,7 +19,8 @@ class Segment {
     /// \returns True if start is less than or equal to end, otherwise false.
     bool isCanonicalizedX() const;
 
-    /// \brief Check whether the segment endpoints are ordered bottom-to-top for sweep use.
+    /// \brief Check whether the segment endpoints are ordered bottom-to-top for sweep use. For
+    /// horizontal segments, the right endpoint is considered above the left.
     /// \returns True if start is below end, breaking horizontal ties from right to left.
     bool isCanonicalizedY() const;
 

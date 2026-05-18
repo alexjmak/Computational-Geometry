@@ -1,4 +1,5 @@
 #include "geometry/intersection.hpp"
+#include <optional>
 
 IntersectionType intersectionType(const Segment& s, const Segment& t) {
     Rational o1 = orientation(s.start, s.end, t.start);
@@ -77,4 +78,17 @@ std::optional<Point> intersectAtY(const Segment& s, const Point& p) {
     }
     Rational t = (p.y - cs.start.y) / (cs.end.y - cs.start.y);
     return cs.start + (cs.end - cs.start) * t;
+}
+
+std::optional<Point> leftRayIntersection(const Segment& segment, const Point& origin) {
+    std::optional<Point> intersection = intersectAtY(segment, origin);
+    if (!intersection) {
+        return std::nullopt;
+    }
+
+    if (intersection->x >= origin.x) {
+        return std::nullopt;
+    }
+
+    return intersection;
 }
