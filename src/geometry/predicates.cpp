@@ -1,4 +1,5 @@
 #include "geometry/predicates.hpp"
+#include "geometry/segment.hpp"
 
 Rational crossProduct(const Vect2& p, const Vect2& q) {
     return p.x * q.y - p.y * q.x;

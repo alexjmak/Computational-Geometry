@@ -2,7 +2,6 @@
 #define PLOT_HPP
 
 #include "geometry/polygon.hpp"
-#include "io/document.hpp"
 #include <QtCharts/QChart>
 #include <QtCharts/QChartView>
 #include <QtCharts/QLineSeries>
@@ -15,6 +14,8 @@
 #include <vector>
 
 QT_USE_NAMESPACE
+
+struct Document;
 
 /// \brief Qt widget for plotting exact geometry primitives.
 class Plot : public QWidget {

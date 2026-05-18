@@ -1,7 +1,9 @@
 #ifndef PREDICATES_HPP
 #define PREDICATES_HPP
 
-#include "geometry/segment.hpp"
+#include "geometry/vector.hpp"
+
+class Segment;
 
 /// \brief Compute the 2D cross product of two vectors.
 /// \param p The first vector.

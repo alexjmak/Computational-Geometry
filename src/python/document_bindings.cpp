@@ -1,9 +1,7 @@
-#include "python/bindings.hpp"
-
+#include "io/document.hpp"
 #include "io/geometry_io.hpp"
-
+#include "python/bindings.hpp"
 #include <pybind11/stl.h>
-
 #include <string>
 #include <utility>
 #include <vector>

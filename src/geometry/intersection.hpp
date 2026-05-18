@@ -1,8 +1,10 @@
 #ifndef INTERSECTION_HPP
 #define INTERSECTION_HPP
 
-#include "geometry/predicates.hpp"
+#include "geometry/vector.hpp"
 #include <optional>
+
+class Segment;
 
 /// \brief Classify how two segments intersect.
 enum class IntersectionType { NONE, POINT, SEGMENT };

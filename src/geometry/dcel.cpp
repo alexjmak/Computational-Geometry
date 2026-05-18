@@ -4,7 +4,9 @@
 #include "geometry/predicates.hpp"
 #include <cassert>
 #include <cstddef>
+#include <optional>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace {

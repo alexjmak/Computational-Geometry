@@ -1,13 +1,10 @@
-#include "python/bindings.hpp"
-
 #include "algorithms/convex_hull.hpp"
 #include "algorithms/line_segment_intersection.hpp"
 #include "geometry/random.hpp"
-
-#include <pybind11/stl.h>
-
+#include "python/bindings.hpp"
 #include <algorithm>
 #include <optional>
+#include <pybind11/stl.h>
 #include <random>
 #include <string>
 #include <unordered_set>

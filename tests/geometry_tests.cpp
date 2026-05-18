@@ -1,11 +1,10 @@
 #include "geometry/dcel.hpp"
 #include "geometry/intersection.hpp"
 #include "geometry/polygon.hpp"
+#include "geometry/predicates.hpp"
 #include "geometry/random.hpp"
 #include "geometry/segment.hpp"
-
 #include <gtest/gtest.h>
-
 #include <random>
 #include <unordered_set>
 #include <vector>

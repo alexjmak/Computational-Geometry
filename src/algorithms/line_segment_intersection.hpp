@@ -2,6 +2,7 @@
 #define LINE_SEGMENT_INTERSECTION_HPP
 
 #include "geometry/intersection.hpp"
+#include "geometry/segment.hpp"
 #include <unordered_set>
 #include <vector>
 

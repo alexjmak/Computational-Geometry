@@ -1,4 +1,6 @@
 #include "geometry/intersection.hpp"
+#include "geometry/predicates.hpp"
+#include "geometry/segment.hpp"
 #include <optional>
 
 IntersectionType intersectionType(const Segment& s, const Segment& t) {

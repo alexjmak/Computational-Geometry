@@ -1,5 +1,6 @@
 #include "geometry/random.hpp"
 #include "algorithms/convex_hull.hpp"
+#include "geometry/polygon.hpp"
 #include <algorithm>
 
 std::vector<Point> randomPoints(int num_points, int min_coordinate, int max_coordinate,

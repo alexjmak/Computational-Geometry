@@ -1,10 +1,8 @@
 #include "algorithms/convex_hull.hpp"
 #include "algorithms/line_segment_intersection.hpp"
-
-#include <gtest/gtest.h>
-
+#include "geometry/polygon.hpp"
 #include <algorithm>
-#include <ostream>
+#include <gtest/gtest.h>
 #include <string>
 #include <unordered_set>
 #include <vector>

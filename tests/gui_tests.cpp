@@ -1,10 +1,9 @@
 #include "gui/plot.hpp"
-
+#include "io/document.hpp"
 #include <QtCharts/QChartView>
 #include <QtCharts/QScatterSeries>
 #include <QtWidgets/QApplication>
 #include <gtest/gtest.h>
-
 #include <vector>
 
 namespace {

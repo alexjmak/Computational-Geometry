@@ -2,6 +2,8 @@
 #define CONVEX_HULL_HPP
 
 #include "geometry/polygon.hpp"
+#include "geometry/segment.hpp"
+#include "geometry/vector.hpp"
 #include <vector>
 
 /// \brief Compute convex hull boundary segments by checking every directed point pair.

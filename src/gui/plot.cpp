@@ -1,4 +1,5 @@
 #include "gui/plot.hpp"
+#include "io/document.hpp"
 #include <QApplication>
 #include <QVBoxLayout>
 #include <QtCharts/QValueAxis>

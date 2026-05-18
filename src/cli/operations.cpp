@@ -3,6 +3,7 @@
 #include "algorithms/line_segment_intersection.hpp"
 #include "cli/arg_parser.hpp"
 #include "geometry/random.hpp"
+#include "io/document.hpp"
 #include "io/geometry_io.hpp"
 #include <algorithm>
 #include <cctype>

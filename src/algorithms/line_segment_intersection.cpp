@@ -1,4 +1,5 @@
 #include "algorithms/line_segment_intersection.hpp"
+#include "geometry/predicates.hpp"
 #include <climits>
 #include <iostream>
 #include <iterator>
@@ -41,10 +42,10 @@ class State;
 /// \brief Segment wrapper with sweep-state-dependent cached ordering data.
 class ActiveSegment {
   public:
-    Segment segment;                 ///< The canonicalized segment represented in the active set.
-    State* line_sweep;               ///< The owning sweep-line state.
-    Rational slope_inverse;          ///< The finite inverse slope used for tie-breaking.
-    int slope_inverse_infinity;      ///< Direction marker for horizontal segment ordering.
+    Segment segment;            ///< The canonicalized segment represented in the active set.
+    State* line_sweep;          ///< The owning sweep-line state.
+    Rational slope_inverse;     ///< The finite inverse slope used for tie-breaking.
+    int slope_inverse_infinity; ///< Direction marker for horizontal segment ordering.
     mutable std::optional<Point> cached_event; ///< The event point for the cached intersection.
     mutable std::optional<Point> cached_point_at_event; ///< Cached intersection at curr_event.
 

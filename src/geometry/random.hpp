@@ -1,8 +1,12 @@
 #ifndef RANDOM_HPP
 #define RANDOM_HPP
 
-#include "geometry/polygon.hpp"
+#include "geometry/vector.hpp"
 #include <random>
+#include <vector>
+
+class Cycle;
+class Segment;
 
 /// \brief Generate a repeatable set of random 2D points.
 /// \param num_points The number of points to generate.
