@@ -1,5 +1,4 @@
 import cgeom as cg
-import fractions
 
 RANDOM_PATH = "random.yaml"
 OUTPUT_PATH = "output.yaml"
