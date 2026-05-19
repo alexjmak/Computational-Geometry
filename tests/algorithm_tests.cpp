@@ -170,6 +170,26 @@ TEST(AssemblePolygonsTest, BuildsDonutWithIsland) {
     EXPECT_DOUBLE_EQ(island->area(), 4.0);
 }
 
+TEST(AssemblePolygonsTest, BuildsPolygonWithTwoHoles) {
+    std::vector<Segment> segments;
+    const std::vector<Segment> outer_segments = rectangleSegments(Point(15, 0), Point(25, 10));
+    const std::vector<Segment> left_hole_segments = rectangleSegments(Point(18, 3), Point(20, 8));
+    const std::vector<Segment> right_hole_segments =
+        rectangleSegments(Point(21, 3), Point(23, 8));
+    segments.insert(segments.end(), outer_segments.begin(), outer_segments.end());
+    segments.insert(segments.end(), left_hole_segments.begin(), left_hole_segments.end());
+    segments.insert(segments.end(), right_hole_segments.begin(), right_hole_segments.end());
+
+    const std::vector<Polygon> polygons = assemblePolygons(segments);
+
+    ASSERT_EQ(polygons.size(), 1);
+    const Polygon& polygon = polygons[0];
+    EXPECT_DOUBLE_EQ(polygon.outer_cycle.area(), 100.0);
+    ASSERT_EQ(polygon.inner_cycles.size(), 2);
+    EXPECT_DOUBLE_EQ(polygon.inner_cycles[0].area() + polygon.inner_cycles[1].area(), 20.0);
+    EXPECT_DOUBLE_EQ(polygon.area(), 80.0);
+}
+
 TEST(LineSegmentIntersectionTest, FindsSingleCrossingPoint) {
     const std::vector<Segment> segments = {
         Segment(Point(0, 0), Point(4, 4)),

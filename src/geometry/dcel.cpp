@@ -204,14 +204,22 @@ std::size_t DCELCreator::findNearestHalfEdgeToLeft(const Point& point) {
             continue;
         }
 
+        // Collinear hits lie on the same horizontal line as the query point and do not identify
+        // which incident face is on the same side as the point.
+        Rational point_orientation =
+            orientation(half_edge_segment.start, half_edge_segment.end, point);
+        if (point_orientation == 0) {
+            continue;
+        }
+
         if (!nearest_intersection || intersection->x > nearest_intersection->x) {
             nearest_intersection = intersection;
             // We want the half-edge whose incident face is on the same side as point.
             // We can determine this by checking the orientation of the half-edge segment with
             // respect to point.
-            if (orientation(half_edge_segment.start, half_edge_segment.end, point) < 0) {
+            if (point_orientation < 0) {
                 nearest_left_half_edge = half_edge.twin;
-            } else {
+            } else if (point_orientation > 0) {
                 nearest_left_half_edge = half_edge_index;
             }
         }
