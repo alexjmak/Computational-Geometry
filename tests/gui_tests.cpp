@@ -4,6 +4,7 @@
 #include <QtCharts/QScatterSeries>
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QGraphicsPathItem>
+#include <QtWidgets/QGraphicsPolygonItem>
 #include <gtest/gtest.h>
 #include <vector>
 
@@ -27,6 +28,16 @@ std::vector<QGraphicsPathItem*> pathItemsFor(const QChart& chart) {
     return path_items;
 }
 
+std::vector<QGraphicsPolygonItem*> polygonItemsFor(const QChart& chart) {
+    std::vector<QGraphicsPolygonItem*> polygon_items;
+    for (QGraphicsItem* item : chart.childItems()) {
+        if (auto* polygon_item = qgraphicsitem_cast<QGraphicsPolygonItem*>(item)) {
+            polygon_items.push_back(polygon_item);
+        }
+    }
+    return polygon_items;
+}
+
 } // namespace
 
 TEST(PlotTest, AddPointsCreatesScatterSeries) {
@@ -47,10 +58,30 @@ TEST(PlotTest, AddSegmentsCreatesOneSeriesPerSegment) {
         Segment(Point(0, 0), Point(1, 1)),
         Segment(Point(1, 0), Point(0, 1)),
     });
+    plot.show();
+    QApplication::processEvents();
 
     QChart* chart = chartFor(plot);
     ASSERT_NE(chart, nullptr);
     EXPECT_EQ(chart->series().size(), 2);
+
+    const std::vector<QGraphicsPolygonItem*> polygon_items = polygonItemsFor(*chart);
+    ASSERT_EQ(polygon_items.size(), 2);
+    EXPECT_EQ(polygon_items[0]->polygon().size(), 3);
+    EXPECT_EQ(polygon_items[1]->polygon().size(), 3);
+}
+
+TEST(PlotTest, AddSegmentsCanHideArrows) {
+    Plot plot;
+
+    plot.addSegments({Segment(Point(0, 0), Point(1, 1))}, "blue", 1, false);
+    plot.show();
+    QApplication::processEvents();
+
+    QChart* chart = chartFor(plot);
+    ASSERT_NE(chart, nullptr);
+    EXPECT_EQ(chart->series().size(), 1);
+    EXPECT_TRUE(polygonItemsFor(*chart).empty());
 }
 
 TEST(PlotTest, SetDocumentRendersAllLayerGeometry) {

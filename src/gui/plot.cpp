@@ -5,6 +5,7 @@
 #include <QVBoxLayout>
 #include <QtCharts/QValueAxis>
 #include <algorithm>
+#include <cmath>
 
 namespace {
 
@@ -24,15 +25,28 @@ double paddedMax(double min_value, double max_value) {
     return max_value + span * 0.05;
 }
 
+void ensureQApplication() {
+    if (QApplication::instance() != nullptr) {
+        return;
+    }
+
+    static int argc = 1;
+    static char app_name[] = "cgeom";
+    static char* argv[] = {app_name, nullptr};
+    static QApplication* application = new QApplication(argc, argv);
+    (void)application;
+}
+
 } // namespace
 
 Plot::Plot(const std::string& title, const std::string& x_label, const std::string& y_label)
-    : chart(nullptr), chartView(nullptr), min_x(), max_x(), min_y(), max_y(), cycle_fills() {
+    : chart(nullptr), chartView(nullptr), min_x(), max_x(), min_y(), max_y(), cycle_fills(),
+      segment_arrows() {
     chart = new QChart();
     chart->setTitle(QString::fromStdString(title));
     chart->setAnimationOptions(QChart::SeriesAnimations);
     chart->legend()->hide();
-    connect(chart, &QChart::plotAreaChanged, this, [this](const QRectF&) { updateCycleFills(); });
+    connect(chart, &QChart::plotAreaChanged, this, [this](const QRectF&) { updateOverlays(); });
 
     chartView = new QChartView(chart);
     chartView->setRenderHint(QPainter::Antialiasing);
@@ -60,7 +74,7 @@ void Plot::addPoints(const std::vector<Point>& points, const std::string& color,
 }
 
 void Plot::addSegments(const std::vector<Segment>& segments, const std::string& color,
-                       int line_width) {
+                       int line_width, bool show_arrows) {
     for (const auto& seg : segments) {
         QLineSeries* series = new QLineSeries();
         series->setColor(QColor(QString::fromStdString(color)));
@@ -72,8 +86,20 @@ void Plot::addSegments(const std::vector<Segment>& segments, const std::string& 
         includePoint(seg.start);
         includePoint(seg.end);
         chart->addSeries(series);
+        if (show_arrows) {
+            addSegmentArrow(seg, color, line_width);
+        }
     }
     updateAxes();
+}
+
+void Plot::addSegmentArrow(const Segment& segment, const std::string& color, int line_width) {
+    QGraphicsPolygonItem* arrow_item = new QGraphicsPolygonItem(chart);
+    QColor arrow_color(QString::fromStdString(color));
+    arrow_item->setBrush(QBrush(arrow_color));
+    arrow_item->setPen(QPen(arrow_color, line_width));
+    arrow_item->setZValue(1.0);
+    segment_arrows.push_back({segment, arrow_item});
 }
 
 void Plot::addCycle(const Cycle& cycle, const std::string& face_color,
@@ -147,6 +173,10 @@ void Plot::clear() {
         delete fill.item;
     }
     cycle_fills.clear();
+    for (SegmentArrow& arrow : segment_arrows) {
+        delete arrow.item;
+    }
+    segment_arrows.clear();
     min_x.reset();
     max_x.reset();
     min_y.reset();
@@ -160,13 +190,14 @@ void Plot::clear() {
 }
 
 void Plot::show() {
+    ensureQApplication();
     QWidget::show();
-    updateCycleFills();
+    updateOverlays();
 }
 
 void Plot::resizeEvent(QResizeEvent* event) {
     QWidget::resizeEvent(event);
-    updateCycleFills();
+    updateOverlays();
 }
 
 void Plot::includePoint(const Point& point) {
@@ -198,10 +229,10 @@ void Plot::updateAxes() {
         }
     }
 
-    updateCycleFills();
+    updateOverlays();
 }
 
-void Plot::updateCycleFills() {
+void Plot::updateOverlays() {
     for (CycleFill& fill : cycle_fills) {
         QPainterPath path;
         path.setFillRule(Qt::OddEvenFill);
@@ -225,5 +256,32 @@ void Plot::updateCycleFills() {
         }
 
         fill.item->setPath(path);
+    }
+
+    for (SegmentArrow& arrow : segment_arrows) {
+        const QPointF start = chart->mapToPosition(
+            QPointF(boost::rational_cast<double>(arrow.segment.start.x),
+                    boost::rational_cast<double>(arrow.segment.start.y)));
+        const QPointF end = chart->mapToPosition(
+            QPointF(boost::rational_cast<double>(arrow.segment.end.x),
+                    boost::rational_cast<double>(arrow.segment.end.y)));
+
+        const QPointF direction = end - start;
+        const double length = std::hypot(direction.x(), direction.y());
+        if (length == 0.0) {
+            arrow.item->setPolygon(QPolygonF());
+            continue;
+        }
+
+        const QPointF unit(direction.x() / length, direction.y() / length);
+        const QPointF normal(-unit.y(), unit.x());
+        const double arrow_length = 10.0;
+        const double arrow_width = 7.0;
+        const QPointF base = end - unit * arrow_length;
+
+        QPolygonF arrowhead;
+        arrowhead << end << base + normal * (arrow_width / 2.0)
+                  << base - normal * (arrow_width / 2.0);
+        arrow.item->setPolygon(arrowhead);
     }
 }

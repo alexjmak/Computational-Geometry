@@ -8,6 +8,7 @@
 #include <QtCharts/QScatterSeries>
 #include <QtGui/QResizeEvent>
 #include <QtWidgets/QGraphicsPathItem>
+#include <QtWidgets/QGraphicsPolygonItem>
 #include <QtWidgets/QWidget>
 #include <optional>
 #include <string>
@@ -37,8 +38,9 @@ class Plot : public QWidget {
     /// \param segments The segments to draw.
     /// \param color The line color.
     /// \param line_width The width of each plotted segment.
+    /// \param show_arrows Whether to draw an arrowhead at each segment end.
     void addSegments(const std::vector<Segment>& segments, const std::string& color = "blue",
-                     int line_width = 1);
+                     int line_width = 1, bool show_arrows = true);
 
     /// \brief Draw a single closed cycle as a polygonal region.
     /// \param cycle The cycle to draw.
@@ -78,6 +80,18 @@ class Plot : public QWidget {
         QGraphicsPathItem* item;                ///< The scene item used to render the fill.
     };
 
+    /// \brief Segment arrowhead overlay tracked in data coordinates.
+    struct SegmentArrow {
+        Segment segment;             ///< The directed segment in data coordinates.
+        QGraphicsPolygonItem* item;  ///< The scene item used to render the arrowhead.
+    };
+
+    /// \brief Add an arrowhead overlay at the end of a directed segment.
+    /// \param segment The directed segment.
+    /// \param color The arrowhead fill color.
+    /// \param line_width The segment line width.
+    void addSegmentArrow(const Segment& segment, const std::string& color, int line_width);
+
     /// \brief Draw only the boundary of a closed cycle.
     /// \param cycle The cycle to draw.
     /// \param edge_color The boundary color.
@@ -98,7 +112,7 @@ class Plot : public QWidget {
     void updateAxes();
 
     /// \brief Reposition all cycle fill scene items after axes or geometry changes.
-    void updateCycleFills();
+    void updateOverlays();
 
     QChart* chart;                      ///< The Qt chart storing plotted series.
     QChartView* chartView;              ///< The Qt widget used to display the chart.
@@ -107,6 +121,7 @@ class Plot : public QWidget {
     std::optional<double> min_y;        ///< The minimum plotted y coordinate.
     std::optional<double> max_y;        ///< The maximum plotted y coordinate.
     std::vector<CycleFill> cycle_fills; ///< Filled cycle overlays in data coordinates.
+    std::vector<SegmentArrow> segment_arrows; ///< Segment arrowhead overlays in data coordinates.
 };
 
 #endif // PLOT_HPP
