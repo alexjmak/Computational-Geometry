@@ -7,7 +7,7 @@
 #include <QtCharts/QLineSeries>
 #include <QtCharts/QScatterSeries>
 #include <QtGui/QResizeEvent>
-#include <QtWidgets/QGraphicsPolygonItem>
+#include <QtWidgets/QGraphicsPathItem>
 #include <QtWidgets/QWidget>
 #include <optional>
 #include <string>
@@ -48,7 +48,7 @@ class Plot : public QWidget {
     void addCycle(const Cycle& cycle, const std::string& face_color = "lightblue",
                   const std::string& edge_color = "blue", double alpha = 0.35);
 
-    /// \brief Draw the outer cycle of a polygon.
+    /// \brief Draw a polygon with its outer cycle and any inner holes.
     /// \param polygon The polygon to draw.
     /// \param face_color The fill color.
     /// \param edge_color The boundary color.
@@ -74,9 +74,21 @@ class Plot : public QWidget {
   private:
     /// \brief Filled polygon overlay tracked in data coordinates.
     struct CycleFill {
-        std::vector<Point> points;  ///< The cycle vertices in data coordinates.
-        QGraphicsPolygonItem* item; ///< The scene item used to render the fill.
+        std::vector<std::vector<Point>> cycles; ///< The cycle vertices in data coordinates.
+        QGraphicsPathItem* item;                ///< The scene item used to render the fill.
     };
+
+    /// \brief Draw only the boundary of a closed cycle.
+    /// \param cycle The cycle to draw.
+    /// \param edge_color The boundary color.
+    void addCycleBoundary(const Cycle& cycle, const std::string& edge_color);
+
+    /// \brief Add a filled overlay for a set of cycles using odd-even filling.
+    /// \param cycles The cycles that define the filled region.
+    /// \param face_color The fill color.
+    /// \param alpha The fill opacity.
+    void addCycleFill(const std::vector<std::vector<Point>>& cycles, const std::string& face_color,
+                      double alpha);
 
     /// \brief Expand the tracked plot bounds to include a point.
     /// \param point The point to include.

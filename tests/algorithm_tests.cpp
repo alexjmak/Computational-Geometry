@@ -43,6 +43,17 @@ void expectIntersections(const std::vector<Segment>& segments,
     expectPointSetsEqual("sweep line", lineSegmentIntersection(segments), expected);
 }
 
+std::vector<Segment> rectangleSegments(const Point& lower_left, const Point& upper_right) {
+    const Point lower_right(upper_right.x, lower_left.y);
+    const Point upper_left(lower_left.x, upper_right.y);
+    return {
+        Segment(lower_left, lower_right),
+        Segment(lower_right, upper_right),
+        Segment(upper_right, upper_left),
+        Segment(upper_left, lower_left),
+    };
+}
+
 } // namespace
 
 TEST(ConvexHullTest, BuildsSquareAroundInteriorPoint) {
@@ -129,6 +140,34 @@ TEST(AssembleCyclesTest, RejectsOpenChains) {
     };
 
     EXPECT_THROW(assembleCycles(segments), std::invalid_argument);
+}
+
+TEST(AssemblePolygonsTest, BuildsDonutWithIsland) {
+    std::vector<Segment> segments;
+    const std::vector<Segment> outer_segments = rectangleSegments(Point(0, 0), Point(10, 10));
+    const std::vector<Segment> hole_segments = rectangleSegments(Point(3, 3), Point(7, 7));
+    const std::vector<Segment> island_segments = rectangleSegments(Point(4, 4), Point(6, 6));
+    segments.insert(segments.end(), outer_segments.begin(), outer_segments.end());
+    segments.insert(segments.end(), hole_segments.begin(), hole_segments.end());
+    segments.insert(segments.end(), island_segments.begin(), island_segments.end());
+
+    const std::vector<Polygon> polygons = assemblePolygons(segments);
+
+    ASSERT_EQ(polygons.size(), 2);
+
+    const auto donut = std::find_if(polygons.begin(), polygons.end(), [](const Polygon& polygon) {
+        return polygon.outer_cycle.area() == 100.0;
+    });
+    ASSERT_NE(donut, polygons.end());
+    ASSERT_EQ(donut->inner_cycles.size(), 1);
+    EXPECT_DOUBLE_EQ(donut->area(), 84.0);
+
+    const auto island = std::find_if(polygons.begin(), polygons.end(), [](const Polygon& polygon) {
+        return polygon.outer_cycle.area() == 4.0;
+    });
+    ASSERT_NE(island, polygons.end());
+    EXPECT_TRUE(island->inner_cycles.empty());
+    EXPECT_DOUBLE_EQ(island->area(), 4.0);
 }
 
 TEST(LineSegmentIntersectionTest, FindsSingleCrossingPoint) {

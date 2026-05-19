@@ -3,6 +3,7 @@
 #include <QtCharts/QChartView>
 #include <QtCharts/QScatterSeries>
 #include <QtWidgets/QApplication>
+#include <QtWidgets/QGraphicsPathItem>
 #include <gtest/gtest.h>
 #include <vector>
 
@@ -14,6 +15,16 @@ QChart* chartFor(const Plot& plot) {
         return nullptr;
     }
     return chart_view->chart();
+}
+
+std::vector<QGraphicsPathItem*> pathItemsFor(const QChart& chart) {
+    std::vector<QGraphicsPathItem*> path_items;
+    for (QGraphicsItem* item : chart.childItems()) {
+        if (auto* path_item = qgraphicsitem_cast<QGraphicsPathItem*>(item)) {
+            path_items.push_back(path_item);
+        }
+    }
+    return path_items;
 }
 
 } // namespace
@@ -56,6 +67,27 @@ TEST(PlotTest, SetDocumentRendersAllLayerGeometry) {
     QChart* chart = chartFor(plot);
     ASSERT_NE(chart, nullptr);
     EXPECT_EQ(chart->series().size(), 3);
+}
+
+TEST(PlotTest, AddPolygonUsesCompoundFillForHoles) {
+    const Cycle outer({Point(0, 0), Point(4, 0), Point(4, 4), Point(0, 4)});
+    const Cycle hole({Point(1, 1), Point(1, 3), Point(3, 3), Point(3, 1)});
+    const Polygon polygon(outer, {hole});
+
+    Plot plot;
+    plot.addPolygon(polygon);
+    plot.show();
+    QApplication::processEvents();
+
+    QChart* chart = chartFor(plot);
+    ASSERT_NE(chart, nullptr);
+    EXPECT_EQ(chart->series().size(), 2);
+
+    const std::vector<QGraphicsPathItem*> path_items = pathItemsFor(*chart);
+    ASSERT_EQ(path_items.size(), 1);
+    EXPECT_EQ(path_items[0]->path().fillRule(), Qt::OddEvenFill);
+    EXPECT_TRUE(path_items[0]->path().contains(chart->mapToPosition(QPointF(0.5, 0.5))));
+    EXPECT_FALSE(path_items[0]->path().contains(chart->mapToPosition(QPointF(2.0, 2.0))));
 }
 
 TEST(PlotTest, ClearRemovesSeriesAndAxes) {

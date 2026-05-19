@@ -1,6 +1,7 @@
 #include "gui/plot.hpp"
 #include "io/document.hpp"
 #include <QApplication>
+#include <QPainterPath>
 #include <QVBoxLayout>
 #include <QtCharts/QValueAxis>
 #include <algorithm>
@@ -31,6 +32,7 @@ Plot::Plot(const std::string& title, const std::string& x_label, const std::stri
     chart->setTitle(QString::fromStdString(title));
     chart->setAnimationOptions(QChart::SeriesAnimations);
     chart->legend()->hide();
+    connect(chart, &QChart::plotAreaChanged, this, [this](const QRectF&) { updateCycleFills(); });
 
     chartView = new QChartView(chart);
     chartView->setRenderHint(QPainter::Antialiasing);
@@ -78,6 +80,29 @@ void Plot::addCycle(const Cycle& cycle, const std::string& face_color,
                     const std::string& edge_color, double alpha) {
     if (cycle.points.empty())
         return;
+    addCycleBoundary(cycle, edge_color);
+    addCycleFill({cycle.points}, face_color, alpha);
+    updateAxes();
+}
+
+void Plot::addPolygon(const Polygon& polygon, const std::string& face_color,
+                      const std::string& edge_color, double alpha) {
+    std::vector<std::vector<Point>> fill_cycles;
+    fill_cycles.push_back(polygon.outer_cycle.points);
+    addCycleBoundary(polygon.outer_cycle, edge_color);
+
+    for (const Cycle& inner_cycle : polygon.inner_cycles) {
+        fill_cycles.push_back(inner_cycle.points);
+        addCycleBoundary(inner_cycle, edge_color);
+    }
+
+    addCycleFill(fill_cycles, face_color, alpha);
+    updateAxes();
+}
+
+void Plot::addCycleBoundary(const Cycle& cycle, const std::string& edge_color) {
+    if (cycle.points.empty())
+        return;
     QLineSeries* series = new QLineSeries();
     series->setColor(QColor(QString::fromStdString(edge_color)));
     for (const auto& p : cycle.points) {
@@ -88,22 +113,17 @@ void Plot::addCycle(const Cycle& cycle, const std::string& face_color,
     series->append(boost::rational_cast<double>(cycle.points[0].x),
                    boost::rational_cast<double>(cycle.points[0].y));
     chart->addSeries(series);
+}
 
+void Plot::addCycleFill(const std::vector<std::vector<Point>>& cycles,
+                        const std::string& face_color, double alpha) {
     QColor fill_color(QString::fromStdString(face_color));
     fill_color.setAlphaF(std::clamp(alpha, 0.0, 1.0));
-    QGraphicsPolygonItem* fill_item = new QGraphicsPolygonItem(chart);
+    QGraphicsPathItem* fill_item = new QGraphicsPathItem(chart);
     fill_item->setBrush(QBrush(fill_color));
     fill_item->setPen(Qt::NoPen);
     fill_item->setZValue(-1.0);
-    cycle_fills.push_back({cycle.points, fill_item});
-
-    updateAxes();
-}
-
-void Plot::addPolygon(const Polygon& polygon, const std::string& face_color,
-                      const std::string& edge_color, double alpha) {
-    // Simplified, draw only the outer cycle.
-    addCycle(polygon.outer_cycle, face_color, edge_color, alpha);
+    cycle_fills.push_back({cycles, fill_item});
 }
 
 void Plot::setDocument(const Document& document) {
@@ -183,13 +203,27 @@ void Plot::updateAxes() {
 
 void Plot::updateCycleFills() {
     for (CycleFill& fill : cycle_fills) {
-        QPolygonF polygon;
-        polygon.reserve(static_cast<int>(fill.points.size()));
-        for (const Point& point : fill.points) {
-            QPointF data_point(boost::rational_cast<double>(point.x),
-                               boost::rational_cast<double>(point.y));
-            polygon << chart->mapToPosition(data_point);
+        QPainterPath path;
+        path.setFillRule(Qt::OddEvenFill);
+
+        for (const std::vector<Point>& cycle : fill.cycles) {
+            if (cycle.empty()) {
+                continue;
+            }
+
+            QPointF first_point =
+                chart->mapToPosition(QPointF(boost::rational_cast<double>(cycle[0].x),
+                                             boost::rational_cast<double>(cycle[0].y)));
+            path.moveTo(first_point);
+
+            for (std::size_t i = 1; i < cycle.size(); ++i) {
+                QPointF data_point(boost::rational_cast<double>(cycle[i].x),
+                                   boost::rational_cast<double>(cycle[i].y));
+                path.lineTo(chart->mapToPosition(data_point));
+            }
+            path.closeSubpath();
         }
-        fill.item->setPolygon(polygon);
+
+        fill.item->setPath(path);
     }
 }
