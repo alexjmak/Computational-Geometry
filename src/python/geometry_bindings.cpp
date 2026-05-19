@@ -84,6 +84,14 @@ void bindGeometry(py::module_& module) {
              py::arg("inner_cycles") = std::vector<Cycle>{})
         .def_readwrite("outer_cycle", &Polygon::outer_cycle)
         .def_readwrite("inner_cycles", &Polygon::inner_cycles)
+        .def("cycles",
+             [](const Polygon& polygon) {
+                 std::vector<Cycle> cycles;
+                 cycles.push_back(polygon.outer_cycle);
+                 cycles.insert(cycles.end(), polygon.inner_cycles.begin(),
+                               polygon.inner_cycles.end());
+                 return cycles;
+             })
         .def("area", &Polygon::area)
         .def("__eq__", &Polygon::operator==);
 

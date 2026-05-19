@@ -3,22 +3,14 @@ import cgeom as cg
 OUTPUT_PATH = "donut_island_assembled.yaml"
 
 
-def rectangle_segments(lower_left: cg.Vect2, upper_right: cg.Vect2) -> list[cg.Segment]:
-    lower_right = cg.Vect2(upper_right.x, lower_left.y)
-    upper_left = cg.Vect2(lower_left.x, upper_right.y)
-    return [
-        cg.Segment(lower_left, lower_right),
-        cg.Segment(lower_right, upper_right),
-        cg.Segment(upper_right, upper_left),
-        cg.Segment(upper_left, lower_left),
-    ]
-
-
 def main() -> None:
     segments = []
-    segments.extend(rectangle_segments(cg.Vect2(0, 0), cg.Vect2(10, 10)))
-    segments.extend(rectangle_segments(cg.Vect2(3, 3), cg.Vect2(7, 7)))
-    segments.extend(rectangle_segments(cg.Vect2(4, 4), cg.Vect2(6, 6)))
+    r1 = cg.Rectangle(cg.Vect2(0, 0), cg.Vect2(10, 10))
+    r2 = cg.Rectangle(cg.Vect2(3, 3), cg.Vect2(7, 7))
+    r3 = cg.Rectangle(cg.Vect2(4, 4), cg.Vect2(6, 6))
+    segments.extend(r1.cycle().segments())
+    segments.extend(r2.cycle().segments())
+    segments.extend(r3.cycle().segments())
 
     polygons = cg.assemble_polygons(segments)
 
@@ -35,8 +27,12 @@ def main() -> None:
     cg.save_yaml(document, OUTPUT_PATH)
     print(f"Wrote {OUTPUT_PATH}")
 
-    cg.show(OUTPUT_PATH)
-
+    plot = cg.Plot(f"{OUTPUT_PATH}", "x", "y")
+    for polygon in polygons:
+        plot.add_polygon(polygon)
+        for cycle in polygon.cycles():
+            plot.add_segments(cycle.segments(), show_arrows=True)
+    plot.show()
 
 if __name__ == "__main__":
     main()
