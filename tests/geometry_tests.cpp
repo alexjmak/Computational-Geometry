@@ -224,8 +224,6 @@ TEST(DCELTest, CreatesFacesForDonutWithIsland) {
 }
 
 TEST(DCELTest, ReusesHalfEdgesForPolygonsSharingEdge) {
-    GTEST_SKIP() << "TODO(#3): Fix face records and half-edge cycle links for shared polygon edges";
-
     const Polygon left(Rectangle(Point(0, 0), Point(1, 1)).cycle());
     const Polygon right(Rectangle(Point(1, 0), Point(2, 1)).cycle());
 
@@ -246,4 +244,33 @@ TEST(DCELTest, ReusesHalfEdgesForPolygonsSharingEdge) {
     }
 
     EXPECT_EQ(shared_edge_half_edges, 2);
+}
+
+TEST(DCELTest, HandlesThreeRectanglesTouchingAtPoints) {
+    const Polygon lower_left(Rectangle(Point(0, 0), Point(1, 1)).cycle());
+    const Polygon middle(Rectangle(Point(1, 1), Point(2, 2)).cycle());
+    const Polygon upper_right(Rectangle(Point(2, 2), Point(3, 3)).cycle());
+
+    const DCEL dcel = DCEL::fromPolygons({lower_left, middle, upper_right});
+
+    EXPECT_EQ(dcel.points.size(), 10);
+    EXPECT_EQ(dcel.half_edges.size(), 24);
+    EXPECT_EQ(dcel.faces.size(), 4);
+    EXPECT_EQ(dcel.faces[DCEL::unbounded_face_index].outer_component, DCEL::npos);
+
+    std::size_t bounded_faces = 0;
+    for (std::size_t i = 0; i < dcel.faces.size(); ++i) {
+        if (i == DCEL::unbounded_face_index) {
+            continue;
+        }
+
+        ++bounded_faces;
+        ASSERT_NE(dcel.faces[i].outer_component, DCEL::npos);
+        EXPECT_TRUE(dcel.faces[i].inner_components.empty());
+        const std::optional<Polygon> polygon = dcel.polygonOf(dcel.faces[i]);
+        ASSERT_TRUE(polygon.has_value());
+        EXPECT_DOUBLE_EQ(polygon->area(), 1.0);
+    }
+
+    EXPECT_EQ(bounded_faces, 3);
 }

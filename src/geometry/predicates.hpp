@@ -17,6 +17,24 @@ Rational crossProduct(const Vect2& p, const Vect2& q);
 /// \returns The scalar dot product p dot q.
 Rational dotProduct(const Vect2& p, const Vect2& q);
 
+/// \brief Compute the signed angle from one vector to another.
+/// \param p The vector to rotate from.
+/// \param q The vector to rotate to.
+/// \returns The signed angle in radians in the range [-pi, pi].
+double signedAngle(const Vect2& p, const Vect2& q);
+
+/// \brief Compute the counter-clockwise angle from one vector to another.
+/// \param p The vector to rotate from.
+/// \param q The vector to rotate to.
+/// \returns The counter-clockwise angle in radians in the range [0, 2pi).
+double ccwAngle(const Vect2& p, const Vect2& q);
+
+/// \brief Compute the clockwise angle from one vector to another.
+/// \param p The vector to rotate from.
+/// \param q The vector to rotate to.
+/// \returns The clockwise angle in radians in the range [0, 2pi).
+double cwAngle(const Vect2& p, const Vect2& q);
+
 /// \brief Determine the orientation of three points.
 /// \param p The first point.
 /// \param q The second point.

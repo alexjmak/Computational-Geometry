@@ -16,6 +16,7 @@ class DCEL {
     /// \brief Face index reserved for the unbounded face.
     static constexpr std::size_t unbounded_face_index = 0;
 
+    // DCEL cannot be copied but can be moved
     DCEL(const DCEL&) = delete;
     DCEL& operator=(const DCEL&) = delete;
     DCEL(DCEL&&) noexcept = default;
