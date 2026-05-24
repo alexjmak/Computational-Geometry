@@ -153,36 +153,37 @@ TEST(DCELTest, CreatesDCELFromPolygons) {
 
     const DCEL dcel = DCEL::fromPolygons({polygon});
 
-    EXPECT_EQ(dcel.points.size(), 8);
-    EXPECT_EQ(dcel.half_edges.size(), 16);
-    EXPECT_EQ(dcel.faces.size(), 3);
+    EXPECT_EQ(dcel.pointCount(), 8);
+    EXPECT_EQ(dcel.halfEdgeCount(), 16);
+    EXPECT_EQ(dcel.faceCount(), 3);
 
-    for (const DCEL::DCELPoint& point : dcel.points) {
-        EXPECT_LT(point.half_edge, dcel.half_edges.size());
-        EXPECT_EQ(dcel.originOf(dcel.half_edges[point.half_edge]), point);
+    for (std::size_t i = 0; i < dcel.pointCount(); ++i) {
+        const DCEL::DCELPoint& point = dcel.point(i);
+        EXPECT_LT(point.half_edge, dcel.halfEdgeCount());
+        EXPECT_EQ(dcel.originOf(dcel.halfEdge(point.half_edge)), point);
     }
 
-    for (std::size_t i = 0; i < dcel.half_edges.size(); ++i) {
-        const DCEL::HalfEdge& half_edge = dcel.half_edges[i];
+    for (std::size_t i = 0; i < dcel.halfEdgeCount(); ++i) {
+        const DCEL::HalfEdge& half_edge = dcel.halfEdge(i);
 
-        EXPECT_LT(half_edge.origin, dcel.points.size());
-        ASSERT_LT(half_edge.twin, dcel.half_edges.size());
-        ASSERT_LT(half_edge.next, dcel.half_edges.size());
-        ASSERT_LT(half_edge.prev, dcel.half_edges.size());
-        ASSERT_LT(half_edge.face, dcel.faces.size());
+        EXPECT_LT(half_edge.origin, dcel.pointCount());
+        ASSERT_LT(half_edge.twin, dcel.halfEdgeCount());
+        ASSERT_LT(half_edge.next, dcel.halfEdgeCount());
+        ASSERT_LT(half_edge.prev, dcel.halfEdgeCount());
+        ASSERT_LT(half_edge.face, dcel.faceCount());
 
         EXPECT_EQ(dcel.twinOf(dcel.twinOf(half_edge)).origin, half_edge.origin);
-        EXPECT_EQ(dcel.half_edges[half_edge.twin].twin, i);
-        EXPECT_EQ(dcel.half_edges[half_edge.next].prev, i);
-        EXPECT_EQ(dcel.half_edges[half_edge.prev].next, i);
-        EXPECT_EQ(&dcel.faceOf(half_edge), &dcel.faces[half_edge.face]);
+        EXPECT_EQ(dcel.halfEdge(half_edge.twin).twin, i);
+        EXPECT_EQ(dcel.halfEdge(half_edge.next).prev, i);
+        EXPECT_EQ(dcel.halfEdge(half_edge.prev).next, i);
+        EXPECT_EQ(&dcel.faceOf(half_edge), &dcel.face(half_edge.face));
 
         const Segment segment = dcel.segmentOf(half_edge);
         EXPECT_EQ(segment.start, dcel.originOf(half_edge));
         EXPECT_EQ(segment.end, dcel.originOf(dcel.twinOf(half_edge)));
     }
 
-    EXPECT_EQ(dcel.faces[DCEL::unbounded_face_index].outer_component, DCEL::npos);
+    EXPECT_EQ(dcel.face(DCEL::unbounded_face_index).outer_component, DCEL::npos);
 }
 
 TEST(DCELTest, CreatesFacesForDonutWithIsland) {
@@ -195,26 +196,27 @@ TEST(DCELTest, CreatesFacesForDonutWithIsland) {
 
     const DCEL dcel = DCEL::fromPolygons({donut, island});
 
-    EXPECT_EQ(dcel.points.size(), 12);
-    EXPECT_EQ(dcel.half_edges.size(), 24);
-    ASSERT_EQ(dcel.faces.size(), 4);
-    EXPECT_EQ(dcel.faces[DCEL::unbounded_face_index].outer_component, DCEL::npos);
+    EXPECT_EQ(dcel.pointCount(), 12);
+    EXPECT_EQ(dcel.halfEdgeCount(), 24);
+    ASSERT_EQ(dcel.faceCount(), 4);
+    EXPECT_EQ(dcel.face(DCEL::unbounded_face_index).outer_component, DCEL::npos);
 
     std::size_t outer_component_count = 0;
     std::size_t inner_component_count = 0;
     std::size_t faces_with_inner_components = 0;
 
-    for (const DCEL::Face& face : dcel.faces) {
+    for (std::size_t i = 0; i < dcel.faceCount(); ++i) {
+        const DCEL::Face& face = dcel.face(i);
         if (face.outer_component != DCEL::npos) {
             ++outer_component_count;
-            EXPECT_LT(face.outer_component, dcel.half_edges.size());
+            EXPECT_LT(face.outer_component, dcel.halfEdgeCount());
         }
         if (!face.inner_components.empty()) {
             ++faces_with_inner_components;
         }
         inner_component_count += face.inner_components.size();
         for (const std::size_t inner_component : face.inner_components) {
-            EXPECT_LT(inner_component, dcel.half_edges.size());
+            EXPECT_LT(inner_component, dcel.halfEdgeCount());
         }
     }
 
@@ -229,13 +231,14 @@ TEST(DCELTest, ReusesHalfEdgesForPolygonsSharingEdge) {
 
     const DCEL dcel = DCEL::fromPolygons({left, right});
 
-    EXPECT_EQ(dcel.points.size(), 6);
-    EXPECT_EQ(dcel.half_edges.size(), 14);
-    EXPECT_EQ(dcel.faces.size(), 3);
-    EXPECT_EQ(dcel.faces[DCEL::unbounded_face_index].outer_component, DCEL::npos);
+    EXPECT_EQ(dcel.pointCount(), 6);
+    EXPECT_EQ(dcel.halfEdgeCount(), 14);
+    EXPECT_EQ(dcel.faceCount(), 3);
+    EXPECT_EQ(dcel.face(DCEL::unbounded_face_index).outer_component, DCEL::npos);
 
     std::size_t shared_edge_half_edges = 0;
-    for (const DCEL::HalfEdge& half_edge : dcel.half_edges) {
+    for (std::size_t i = 0; i < dcel.halfEdgeCount(); ++i) {
+        const DCEL::HalfEdge& half_edge = dcel.halfEdge(i);
         const Segment segment = dcel.segmentOf(half_edge);
         if ((segment.start == Point(1, 0) && segment.end == Point(1, 1)) ||
             (segment.start == Point(1, 1) && segment.end == Point(1, 0))) {
@@ -253,21 +256,22 @@ TEST(DCELTest, HandlesThreeRectanglesTouchingAtPoints) {
 
     const DCEL dcel = DCEL::fromPolygons({lower_left, middle, upper_right});
 
-    EXPECT_EQ(dcel.points.size(), 10);
-    EXPECT_EQ(dcel.half_edges.size(), 24);
-    EXPECT_EQ(dcel.faces.size(), 4);
-    EXPECT_EQ(dcel.faces[DCEL::unbounded_face_index].outer_component, DCEL::npos);
+    EXPECT_EQ(dcel.pointCount(), 10);
+    EXPECT_EQ(dcel.halfEdgeCount(), 24);
+    EXPECT_EQ(dcel.faceCount(), 4);
+    EXPECT_EQ(dcel.face(DCEL::unbounded_face_index).outer_component, DCEL::npos);
 
     std::size_t bounded_faces = 0;
-    for (std::size_t i = 0; i < dcel.faces.size(); ++i) {
+    for (std::size_t i = 0; i < dcel.faceCount(); ++i) {
         if (i == DCEL::unbounded_face_index) {
             continue;
         }
 
+        const DCEL::Face& face = dcel.face(i);
         ++bounded_faces;
-        ASSERT_NE(dcel.faces[i].outer_component, DCEL::npos);
-        EXPECT_TRUE(dcel.faces[i].inner_components.empty());
-        const std::optional<Polygon> polygon = dcel.polygonOf(dcel.faces[i]);
+        ASSERT_NE(face.outer_component, DCEL::npos);
+        EXPECT_TRUE(face.inner_components.empty());
+        const std::optional<Polygon> polygon = dcel.polygonOf(face);
         ASSERT_TRUE(polygon.has_value());
         EXPECT_DOUBLE_EQ(polygon->area(), 1.0);
     }

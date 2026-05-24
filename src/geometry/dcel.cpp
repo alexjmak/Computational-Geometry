@@ -93,12 +93,14 @@ struct DCELBuilderRing {
     bool is_outer;                  ///< True when the ring is an outer face boundary.
 };
 
+} // namespace
+
 /// \brief Incremental builder for constructing a DCEL from polygon boundaries.
-class DCELCreator {
+class DCEL::Creator {
   public:
     /// \brief Initialize a builder around an empty DCEL supplied by a factory.
     /// \param dcel The empty DCEL to populate.
-    explicit DCELCreator(DCEL dcel);
+    explicit Creator(DCEL dcel);
 
     /// \brief Build a DCEL from polygon boundary rings.
     /// \param rings The rings whose boundaries should be inserted.
@@ -207,9 +209,9 @@ class DCELCreator {
                                          std::unordered_set<std::size_t>& visited);
 };
 
-DCELCreator::DCELCreator(DCEL dcel) : dcel(std::move(dcel)) {}
+DCEL::Creator::Creator(DCEL dcel) : dcel(std::move(dcel)) {}
 
-std::size_t DCELCreator::nextNonInputBoundaryEdge(std::size_t prev_edge_idx,
+std::size_t DCEL::Creator::nextNonInputBoundaryEdge(std::size_t prev_edge_idx,
                                                   const std::vector<std::size_t>& next_edges,
                                                   std::unordered_set<std::size_t>& visited) {
     if (next_edges.size() == 0) {
@@ -269,7 +271,7 @@ std::size_t DCELCreator::nextNonInputBoundaryEdge(std::size_t prev_edge_idx,
     return next_edge;
 }
 
-std::vector<Ring> DCELCreator::assembleBoundaryRing(const std::vector<std::size_t>& edges) {
+std::vector<Ring> DCEL::Creator::assembleBoundaryRing(const std::vector<std::size_t>& edges) {
     std::unordered_map<std::size_t, std::vector<std::size_t>> origin_to_edge;
     for (const std::size_t edge_index : edges) {
         DCEL::HalfEdge half_edge = dcel.half_edges[edge_index];
@@ -323,7 +325,7 @@ std::vector<Ring> DCELCreator::assembleBoundaryRing(const std::vector<std::size_
     return rings;
 }
 
-DCEL DCELCreator::build(const std::vector<const Ring*>& rings) {
+DCEL DCEL::Creator::build(const std::vector<const Ring*>& rings) {
     reserve(rings);
 
     for (const Ring* ring : rings) {
@@ -350,7 +352,7 @@ DCEL DCELCreator::build(const std::vector<const Ring*>& rings) {
     return std::move(dcel);
 }
 
-std::size_t DCELCreator::findNearestHalfEdgeToLeft(const Point& point) {
+std::size_t DCEL::Creator::findNearestHalfEdgeToLeft(const Point& point) {
     std::size_t nearest_left_half_edge = DCEL::npos;
     std::optional<Point> nearest_intersection;
 
@@ -408,7 +410,7 @@ std::size_t DCELCreator::findNearestHalfEdgeToLeft(const Point& point) {
     return nearest_left_half_edge;
 }
 
-void DCELCreator::createFaces() {
+void DCEL::Creator::createFaces() {
     const std::size_t unbounded_ring_index = ring_union_find.addSet();
 
     groupBoundaryRingsByFace(unbounded_ring_index);
@@ -425,7 +427,7 @@ void DCELCreator::createFaces() {
     }
 }
 
-void DCELCreator::groupBoundaryRingsByFace(const std::size_t unbounded_ring_index) {
+void DCEL::Creator::groupBoundaryRingsByFace(const std::size_t unbounded_ring_index) {
     // There is an arc between two rings if and only if one of the rings is the boundary of a hole
     // and the other ring has a half-edge immediately to the left of the leftmost vertex of that
     // hole ring.
@@ -452,7 +454,7 @@ void DCELCreator::groupBoundaryRingsByFace(const std::size_t unbounded_ring_inde
 }
 
 std::unordered_map<std::size_t, std::size_t>
-DCELCreator::createFaceByRingRoot(const std::size_t unbounded_ring_index) {
+DCEL::Creator::createFaceByRingRoot(const std::size_t unbounded_ring_index) {
     // Group rings into faces based on which rings are connected by unions.
     std::unordered_map<std::size_t, std::size_t> root_ring_to_face;
 
@@ -466,7 +468,7 @@ DCELCreator::createFaceByRingRoot(const std::size_t unbounded_ring_index) {
 }
 
 std::size_t
-DCELCreator::getOrCreateFace(const std::size_t root_ring_index,
+DCEL::Creator::getOrCreateFace(const std::size_t root_ring_index,
                              std::unordered_map<std::size_t, std::size_t>& root_ring_to_face) {
     auto found = root_ring_to_face.find(root_ring_index);
     if (found != root_ring_to_face.end()) {
@@ -479,7 +481,7 @@ DCELCreator::getOrCreateFace(const std::size_t root_ring_index,
     return face_index;
 }
 
-void DCELCreator::addBoundaryRingToFace(const DCELBuilderRing& boundary_ring,
+void DCEL::Creator::addBoundaryRingToFace(const DCELBuilderRing& boundary_ring,
                                         const std::size_t face_index) {
 
     // Assign this face to every half-edge around the boundary component.
@@ -495,7 +497,7 @@ void DCELCreator::addBoundaryRingToFace(const DCELBuilderRing& boundary_ring,
     }
 }
 
-void DCELCreator::assignFaceToBoundaryRing(const DCELBuilderRing& boundary_ring,
+void DCEL::Creator::assignFaceToBoundaryRing(const DCELBuilderRing& boundary_ring,
                                            const std::size_t face_index) {
     const std::size_t start = boundary_ring.leftmost_half_edge;
     std::size_t current = start;
@@ -510,7 +512,7 @@ void DCELCreator::assignFaceToBoundaryRing(const DCELBuilderRing& boundary_ring,
     assert(false && "Boundary ring does not close while assigning face");
 }
 
-void DCELCreator::reserve(const std::vector<const Ring*>& rings) {
+void DCEL::Creator::reserve(const std::vector<const Ring*>& rings) {
     std::size_t segment_count = 0;
     std::size_t ring_count = 0;
     for (const Ring* ring : rings) {
@@ -524,7 +526,7 @@ void DCELCreator::reserve(const std::vector<const Ring*>& rings) {
     boundary_rings.reserve(ring_count * 2);
 }
 
-std::size_t DCELCreator::getOrCreatePoint(const Point& point) {
+std::size_t DCEL::Creator::getOrCreatePoint(const Point& point) {
     const auto found = point_map.find(point);
     if (found != point_map.end()) {
         return found->second;
@@ -536,7 +538,7 @@ std::size_t DCELCreator::getOrCreatePoint(const Point& point) {
     return point_index;
 }
 
-std::size_t DCELCreator::createHalfEdge(const Segment& segment) {
+std::size_t DCEL::Creator::createHalfEdge(const Segment& segment) {
     const std::size_t start_index = getOrCreatePoint(segment.start);
 
     dcel.half_edges.emplace_back(DCEL::HalfEdge(start_index));
@@ -552,7 +554,7 @@ std::size_t DCELCreator::createHalfEdge(const Segment& segment) {
     return half_edge_index;
 }
 
-std::size_t DCELCreator::addBoundaryRing(const std::vector<std::size_t>& half_edge_indices,
+std::size_t DCEL::Creator::addBoundaryRing(const std::vector<std::size_t>& half_edge_indices,
                                          bool isOuter) {
     const std::size_t ring_index = boundary_rings.size();
     boundary_rings.push_back({DCEL::npos, isOuter});
@@ -564,7 +566,7 @@ std::size_t DCELCreator::addBoundaryRing(const std::vector<std::size_t>& half_ed
     return ring_index;
 }
 
-void DCELCreator::processBoundaryRing(const Ring& ring, bool is_input_ring) {
+void DCEL::Creator::processBoundaryRing(const Ring& ring, bool is_input_ring) {
     const std::vector<Segment> segments = ring.segments();
     if (segments.empty()) {
         return;
@@ -595,7 +597,7 @@ void DCELCreator::processBoundaryRing(const Ring& ring, bool is_input_ring) {
     }
 }
 
-void DCELCreator::linkBoundaryRingHalfEdges(const std::vector<std::size_t>& half_edge_indices) {
+void DCEL::Creator::linkBoundaryRingHalfEdges(const std::vector<std::size_t>& half_edge_indices) {
     for (std::size_t i = 0; i < half_edge_indices.size(); ++i) {
         const std::size_t prev =
             half_edge_indices[(i + half_edge_indices.size() - 1) % half_edge_indices.size()];
@@ -608,7 +610,7 @@ void DCELCreator::linkBoundaryRingHalfEdges(const std::vector<std::size_t>& half
     }
 }
 
-std::size_t DCELCreator::leftmostHalfEdge(const std::vector<std::size_t>& half_edge_indices) {
+std::size_t DCEL::Creator::leftmostHalfEdge(const std::vector<std::size_t>& half_edge_indices) {
     assert(!half_edge_indices.empty());
 
     std::size_t leftmost_half_edge = half_edge_indices.front();
@@ -622,7 +624,7 @@ std::size_t DCELCreator::leftmostHalfEdge(const std::vector<std::size_t>& half_e
     return leftmost_half_edge;
 }
 
-std::size_t DCELCreator::getOrCreateHalfEdgePair(const Segment& segment) {
+std::size_t DCEL::Creator::getOrCreateHalfEdgePair(const Segment& segment) {
     const Segment reversed_segment = segment.reversed();
     const auto found = segment_map.find(segment);
     if (found != segment_map.end()) {
@@ -645,8 +647,6 @@ std::size_t DCELCreator::getOrCreateHalfEdgePair(const Segment& segment) {
     return half_edge_index;
 }
 
-} // namespace
-
 DCEL::DCELPoint::DCELPoint(Rational x, Rational y) : Point(x, y), half_edge(DCEL::npos) {}
 
 DCEL::DCELPoint::DCELPoint(const Point& p) : Point(p), half_edge(DCEL::npos) {}
@@ -655,6 +655,33 @@ DCEL::HalfEdge::HalfEdge(std::size_t origin)
     : origin(origin), twin(DCEL::npos), next(DCEL::npos), prev(DCEL::npos), face(DCEL::npos) {}
 
 DCEL::Face::Face() : outer_component(DCEL::npos), inner_components() {}
+
+std::size_t DCEL::pointCount() const {
+    return points.size();
+}
+
+std::size_t DCEL::halfEdgeCount() const {
+    return half_edges.size();
+}
+
+std::size_t DCEL::faceCount() const {
+    return faces.size();
+}
+
+const DCEL::DCELPoint& DCEL::point(std::size_t index) const {
+    assert(index < points.size());
+    return points[index];
+}
+
+const DCEL::HalfEdge& DCEL::halfEdge(std::size_t index) const {
+    assert(index < half_edges.size());
+    return half_edges[index];
+}
+
+const DCEL::Face& DCEL::face(std::size_t index) const {
+    assert(index < faces.size());
+    return faces[index];
+}
 
 DCEL::DCELPoint& DCEL::originOf(const DCEL::HalfEdge& half_edge) {
     assert(half_edge.origin != npos);
@@ -746,11 +773,11 @@ DCEL DCEL::fromPolygons(const std::vector<Polygon>& polygons) {
             rings.push_back(ring);
         }
     }
-    return DCELCreator(DCEL()).build(rings);
+    return DCEL::Creator(DCEL()).build(rings);
 }
 
 DCEL DCEL::fromRings(const std::vector<const Ring*>& rings) {
-    return DCELCreator(DCEL()).build(rings);
+    return DCEL::Creator(DCEL()).build(rings);
 }
 
 DCEL DCEL::fromRings(const std::vector<Ring>& rings) {
@@ -758,7 +785,7 @@ DCEL DCEL::fromRings(const std::vector<Ring>& rings) {
     for (const Ring& ring : rings) {
         ring_pointers.push_back(&ring);
     }
-    return DCELCreator(DCEL()).build(ring_pointers);
+    return DCEL::Creator(DCEL()).build(ring_pointers);
 }
 
 DCEL DCEL::fromSegments(const std::vector<Segment>& segments) {
@@ -767,7 +794,7 @@ DCEL DCEL::fromSegments(const std::vector<Segment>& segments) {
     for (const Ring& ring : assembled_rings) {
         rings.push_back(&ring);
     }
-    return DCELCreator(DCEL()).build(rings);
+    return DCEL::Creator(DCEL()).build(rings);
 }
 
 const DCEL::Face& DCEL::unboundedFace() const {

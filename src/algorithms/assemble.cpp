@@ -84,12 +84,12 @@ std::vector<Polygon> assemblePolygons(const std::vector<Segment>& segments) {
     // Face depth counts how many boundary rings separate a face from the unbounded face.
     // By the odd-even fill rule, odd-depth faces are filled polygon interiors, while
     // even-depth faces are exterior/hole regions.
-    for (std::size_t i = 0; i < dcel.faces.size(); ++i) {
+    for (std::size_t i = 0; i < dcel.faceCount(); ++i) {
         const std::size_t depth = face_depths[i];
         assert(depth != DCEL::npos);
 
         if (depth % 2 == 1) {
-            const DCEL::Face& face = dcel.faces[i];
+            const DCEL::Face& face = dcel.face(i);
             assert(face.outer_component != DCEL::npos);
             std::optional<Polygon> polygon = dcel.polygonOf(face);
             assert(polygon.has_value());

@@ -64,14 +64,32 @@ class DCEL {
         std::vector<std::size_t> inner_components; ///< Half-edges on hole boundaries.
     };
 
-    std::vector<DCELPoint> points;
-    std::vector<HalfEdge> half_edges;
-    std::vector<Face> faces;
+    /// \brief Return the number of vertices in the DCEL.
+    /// \returns The number of stored DCEL points.
+    std::size_t pointCount() const;
 
-    /// \brief Resolve the origin vertex of a half-edge.
-    /// \param half_edge The half-edge whose origin should be returned.
-    /// \returns A mutable reference to the origin vertex.
-    DCELPoint& originOf(const HalfEdge& half_edge);
+    /// \brief Return the number of directed half-edges in the DCEL.
+    /// \returns The number of stored half-edges.
+    std::size_t halfEdgeCount() const;
+
+    /// \brief Return the number of faces in the DCEL.
+    /// \returns The number of stored faces.
+    std::size_t faceCount() const;
+
+    /// \brief Access a vertex by index.
+    /// \param index The point index to access.
+    /// \returns A const reference to the indexed DCEL point.
+    const DCELPoint& point(std::size_t index) const;
+
+    /// \brief Access a half-edge by index.
+    /// \param index The half-edge index to access.
+    /// \returns A const reference to the indexed half-edge.
+    const HalfEdge& halfEdge(std::size_t index) const;
+
+    /// \brief Access a face by index.
+    /// \param index The face index to access.
+    /// \returns A const reference to the indexed face.
+    const Face& face(std::size_t index) const;
 
     /// \brief Resolve the origin vertex of a half-edge.
     /// \param half_edge The half-edge whose origin should be returned.
@@ -80,18 +98,8 @@ class DCEL {
 
     /// \brief Resolve the twin half-edge of a half-edge.
     /// \param half_edge The half-edge whose twin should be returned.
-    /// \returns A mutable reference to the twin half-edge.
-    HalfEdge& twinOf(const HalfEdge& half_edge);
-
-    /// \brief Resolve the twin half-edge of a half-edge.
-    /// \param half_edge The half-edge whose twin should be returned.
     /// \returns A const reference to the twin half-edge.
     const HalfEdge& twinOf(const HalfEdge& half_edge) const;
-
-    /// \brief Resolve the next half-edge around the incident face.
-    /// \param half_edge The half-edge whose successor should be returned.
-    /// \returns A mutable reference to the next half-edge.
-    HalfEdge& nextOf(const HalfEdge& half_edge);
 
     /// \brief Resolve the next half-edge around the incident face.
     /// \param half_edge The half-edge whose successor should be returned.
@@ -100,18 +108,8 @@ class DCEL {
 
     /// \brief Resolve the previous half-edge around the incident face.
     /// \param half_edge The half-edge whose predecessor should be returned.
-    /// \returns A mutable reference to the previous half-edge.
-    HalfEdge& prevOf(const HalfEdge& half_edge);
-
-    /// \brief Resolve the previous half-edge around the incident face.
-    /// \param half_edge The half-edge whose predecessor should be returned.
     /// \returns A const reference to the previous half-edge.
     const HalfEdge& prevOf(const HalfEdge& half_edge) const;
-
-    /// \brief Resolve the face incident to a half-edge.
-    /// \param half_edge The half-edge whose incident face should be returned.
-    /// \returns A mutable reference to the incident face.
-    Face& faceOf(const HalfEdge& half_edge);
 
     /// \brief Resolve the face incident to a half-edge.
     /// \param half_edge The half-edge whose incident face should be returned.
@@ -163,9 +161,40 @@ class DCEL {
     static DCEL fromSegments(const std::vector<Segment>& segments);
 
   private:
+    class Creator;
+
+    std::vector<DCELPoint> points;
+    std::vector<HalfEdge> half_edges;
+    std::vector<Face> faces;
+
     // External code cannot create an empty/unbuilt DCEL.
     // Only the static DCEL factory methods can create one.
     DCEL() = default;
+
+    /// \brief Resolve the origin vertex of a half-edge.
+    /// \param half_edge The half-edge whose origin should be returned.
+    /// \returns A mutable reference to the origin vertex.
+    DCELPoint& originOf(const HalfEdge& half_edge);
+
+    /// \brief Resolve the twin half-edge of a half-edge.
+    /// \param half_edge The half-edge whose twin should be returned.
+    /// \returns A mutable reference to the twin half-edge.
+    HalfEdge& twinOf(const HalfEdge& half_edge);
+
+    /// \brief Resolve the next half-edge around the incident face.
+    /// \param half_edge The half-edge whose successor should be returned.
+    /// \returns A mutable reference to the next half-edge.
+    HalfEdge& nextOf(const HalfEdge& half_edge);
+
+    /// \brief Resolve the previous half-edge around the incident face.
+    /// \param half_edge The half-edge whose predecessor should be returned.
+    /// \returns A mutable reference to the previous half-edge.
+    HalfEdge& prevOf(const HalfEdge& half_edge);
+
+    /// \brief Resolve the face incident to a half-edge.
+    /// \param half_edge The half-edge whose incident face should be returned.
+    /// \returns A mutable reference to the incident face.
+    Face& faceOf(const HalfEdge& half_edge);
 };
 
 #endif // DCEL_HPP
