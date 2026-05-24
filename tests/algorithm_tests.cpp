@@ -61,7 +61,7 @@ TEST(ConvexHullTest, BuildsSquareAroundInteriorPoint) {
         Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1), Point(Rational(1, 2), Rational(1, 2)),
     };
 
-    const Cycle hull = convexHull(points);
+    const Ring hull = convexHull(points);
 
     EXPECT_EQ(hull.points,
               std::vector<Point>({Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1)}));
@@ -71,7 +71,7 @@ TEST(ConvexHullTest, BuildsSquareAroundInteriorPoint) {
 TEST(ConvexHullTest, KeepsOnlyEndpointsForCollinearPoints) {
     const std::vector<Point> points = {Point(0, 0), Point(1, 0), Point(2, 0), Point(3, 0)};
 
-    const Cycle hull = convexHull(points);
+    const Ring hull = convexHull(points);
 
     EXPECT_EQ(hull.points, std::vector<Point>({Point(0, 0), Point(3, 0)}));
 }
@@ -80,7 +80,7 @@ TEST(ConvexHullTest, SlowAndFastHullUseSameBoundaryPoints) {
     const std::vector<Point> points = {Point(0, 0), Point(2, 0), Point(2, 2),
                                        Point(0, 2), Point(1, 1), Point(1, 0)};
 
-    const Cycle hull = convexHull(points);
+    const Ring hull = convexHull(points);
     const std::vector<Segment> slow_hull = slowConvexHull(points);
 
     std::vector<Point> slow_points;
@@ -91,7 +91,7 @@ TEST(ConvexHullTest, SlowAndFastHullUseSameBoundaryPoints) {
     EXPECT_EQ(pointSet(hull.points), pointSet(slow_points));
 }
 
-TEST(AssembleCyclesTest, BuildsOuterCycleFromUnorderedSegments) {
+TEST(AssembleRingsTest, BuildsOuterRingFromUnorderedSegments) {
     const std::vector<Segment> segments = {
         Segment(Point(1, 0), Point(1, 1)),
         Segment(Point(0, 1), Point(0, 0)),
@@ -99,16 +99,16 @@ TEST(AssembleCyclesTest, BuildsOuterCycleFromUnorderedSegments) {
         Segment(Point(0, 0), Point(1, 0)),
     };
 
-    const std::vector<Cycle> cycles = assembleCycles(segments);
+    const std::vector<Ring> rings = assembleRings(segments);
 
-    ASSERT_EQ(cycles.size(), 1);
-    EXPECT_TRUE(cycles[0].isOuter());
-    EXPECT_DOUBLE_EQ(cycles[0].area(), 1.0);
-    EXPECT_EQ(pointSet(cycles[0].points),
+    ASSERT_EQ(rings.size(), 1);
+    EXPECT_TRUE(rings[0].isOuter());
+    EXPECT_DOUBLE_EQ(rings[0].area(), 1.0);
+    EXPECT_EQ(pointSet(rings[0].points),
               pointSet({Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1)}));
 }
 
-TEST(AssembleCyclesTest, BuildsMultipleDisjointOuterCycles) {
+TEST(AssembleRingsTest, BuildsMultipleDisjointOuterRings) {
     const std::vector<Segment> segments = {
         Segment(Point(0, 0), Point(1, 0)), Segment(Point(1, 0), Point(1, 1)),
         Segment(Point(1, 1), Point(0, 1)), Segment(Point(0, 1), Point(0, 0)),
@@ -116,30 +116,30 @@ TEST(AssembleCyclesTest, BuildsMultipleDisjointOuterCycles) {
         Segment(Point(5, 2), Point(3, 2)), Segment(Point(3, 2), Point(3, 0)),
     };
 
-    const std::vector<Cycle> cycles = assembleCycles(segments);
+    const std::vector<Ring> rings = assembleRings(segments);
 
-    ASSERT_EQ(cycles.size(), 2);
-    EXPECT_TRUE(cycles[0].isOuter());
-    EXPECT_TRUE(cycles[1].isOuter());
-    EXPECT_DOUBLE_EQ(cycles[0].area() + cycles[1].area(), 5.0);
+    ASSERT_EQ(rings.size(), 2);
+    EXPECT_TRUE(rings[0].isOuter());
+    EXPECT_TRUE(rings[1].isOuter());
+    EXPECT_DOUBLE_EQ(rings[0].area() + rings[1].area(), 5.0);
 }
 
-TEST(AssembleCyclesTest, RejectsDuplicateReversedAndDegenerateSegments) {
+TEST(AssembleRingsTest, RejectsDuplicateReversedAndDegenerateSegments) {
     EXPECT_THROW(
-        assembleCycles({Segment(Point(0, 0), Point(1, 0)), Segment(Point(1, 0), Point(0, 0))}),
+        assembleRings({Segment(Point(0, 0), Point(1, 0)), Segment(Point(1, 0), Point(0, 0))}),
         std::invalid_argument);
 
-    EXPECT_THROW(assembleCycles({Segment(Point(0, 0), Point(0, 0))}), std::invalid_argument);
+    EXPECT_THROW(assembleRings({Segment(Point(0, 0), Point(0, 0))}), std::invalid_argument);
 }
 
-TEST(AssembleCyclesTest, RejectsOpenChains) {
+TEST(AssembleRingsTest, RejectsOpenChains) {
     const std::vector<Segment> segments = {
         Segment(Point(0, 0), Point(1, 0)),
         Segment(Point(1, 0), Point(1, 1)),
         Segment(Point(1, 1), Point(0, 1)),
     };
 
-    EXPECT_THROW(assembleCycles(segments), std::invalid_argument);
+    EXPECT_THROW(assembleRings(segments), std::invalid_argument);
 }
 
 TEST(AssemblePolygonsTest, BuildsDonutWithIsland) {
@@ -156,17 +156,17 @@ TEST(AssemblePolygonsTest, BuildsDonutWithIsland) {
     ASSERT_EQ(polygons.size(), 2);
 
     const auto donut = std::find_if(polygons.begin(), polygons.end(), [](const Polygon& polygon) {
-        return polygon.outer_cycle.area() == 100.0;
+        return polygon.outer_ring.area() == 100.0;
     });
     ASSERT_NE(donut, polygons.end());
-    ASSERT_EQ(donut->inner_cycles.size(), 1);
+    ASSERT_EQ(donut->inner_rings.size(), 1);
     EXPECT_DOUBLE_EQ(donut->area(), 84.0);
 
     const auto island = std::find_if(polygons.begin(), polygons.end(), [](const Polygon& polygon) {
-        return polygon.outer_cycle.area() == 4.0;
+        return polygon.outer_ring.area() == 4.0;
     });
     ASSERT_NE(island, polygons.end());
-    EXPECT_TRUE(island->inner_cycles.empty());
+    EXPECT_TRUE(island->inner_rings.empty());
     EXPECT_DOUBLE_EQ(island->area(), 4.0);
 }
 
@@ -174,8 +174,7 @@ TEST(AssemblePolygonsTest, BuildsPolygonWithTwoHoles) {
     std::vector<Segment> segments;
     const std::vector<Segment> outer_segments = rectangleSegments(Point(15, 0), Point(25, 10));
     const std::vector<Segment> left_hole_segments = rectangleSegments(Point(18, 3), Point(20, 8));
-    const std::vector<Segment> right_hole_segments =
-        rectangleSegments(Point(21, 3), Point(23, 8));
+    const std::vector<Segment> right_hole_segments = rectangleSegments(Point(21, 3), Point(23, 8));
     segments.insert(segments.end(), outer_segments.begin(), outer_segments.end());
     segments.insert(segments.end(), left_hole_segments.begin(), left_hole_segments.end());
     segments.insert(segments.end(), right_hole_segments.begin(), right_hole_segments.end());
@@ -184,9 +183,9 @@ TEST(AssemblePolygonsTest, BuildsPolygonWithTwoHoles) {
 
     ASSERT_EQ(polygons.size(), 1);
     const Polygon& polygon = polygons[0];
-    EXPECT_DOUBLE_EQ(polygon.outer_cycle.area(), 100.0);
-    ASSERT_EQ(polygon.inner_cycles.size(), 2);
-    EXPECT_DOUBLE_EQ(polygon.inner_cycles[0].area() + polygon.inner_cycles[1].area(), 20.0);
+    EXPECT_DOUBLE_EQ(polygon.outer_ring.area(), 100.0);
+    ASSERT_EQ(polygon.inner_rings.size(), 2);
+    EXPECT_DOUBLE_EQ(polygon.inner_rings[0].area() + polygon.inner_rings[1].area(), 20.0);
     EXPECT_DOUBLE_EQ(polygon.area(), 80.0);
 }
 

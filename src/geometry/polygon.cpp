@@ -3,9 +3,9 @@
 #include <cmath>
 #include <stdexcept>
 
-Cycle::Cycle(std::vector<Point> points) : points(std::move(points)) {}
+Ring::Ring(std::vector<Point> points) : points(std::move(points)) {}
 
-double Cycle::signedArea() const {
+double Ring::signedArea() const {
     if (points.size() < 3) {
         return 0.0;
     }
@@ -18,15 +18,15 @@ double Cycle::signedArea() const {
     return 0.5 * ret;
 }
 
-double Cycle::area() const {
+double Ring::area() const {
     return std::abs(signedArea());
 }
 
-bool Cycle::isOuter() const {
+bool Ring::isOuter() const {
     return signedArea() > 0.0;
 }
 
-std::vector<Segment> Cycle::segments() const {
+std::vector<Segment> Ring::segments() const {
     std::vector<Segment> segments;
     Point prev = points.back();
     for (const auto& point : points) {
@@ -36,73 +36,73 @@ std::vector<Segment> Cycle::segments() const {
     return segments;
 }
 
-bool Cycle::operator==(const Cycle& other) const {
+bool Ring::operator==(const Ring& other) const {
     return points == other.points;
 }
 
-void Cycle::reverse() {
+void Ring::reverse() {
     std::reverse(points.begin(), points.end());
 }
 
-Polygon::Polygon(Cycle outer_cycle, std::vector<Cycle> inner_cycles)
-    : outer_cycle(outer_cycle), inner_cycles(inner_cycles) {
-    if (!this->outer_cycle.isOuter()) {
-        throw std::invalid_argument("Polygon outer cycle must be counter-clockwise");
+Polygon::Polygon(Ring outer_ring, std::vector<Ring> inner_rings)
+    : outer_ring(outer_ring), inner_rings(inner_rings) {
+    if (!this->outer_ring.isOuter()) {
+        throw std::invalid_argument("Polygon outer ring must be counter-clockwise");
     }
-    for (const Cycle& inner_cycle : this->inner_cycles) {
-        if (inner_cycle.isOuter()) {
-            throw std::invalid_argument("Polygon inner cycles must be clockwise");
+    for (const Ring& inner_ring : this->inner_rings) {
+        if (inner_ring.isOuter()) {
+            throw std::invalid_argument("Polygon inner rings must be clockwise");
         }
     }
 }
 
-std::vector<Cycle*> Polygon::cycles() {
-    std::vector<const Cycle*> const_cycles = static_cast<const Polygon&>(*this).cycles();
-    std::vector<Cycle*> ret;
-    ret.reserve(const_cycles.size());
+std::vector<Ring*> Polygon::rings() {
+    std::vector<const Ring*> const_rings = static_cast<const Polygon&>(*this).rings();
+    std::vector<Ring*> ret;
+    ret.reserve(const_rings.size());
 
-    for (const Cycle* cycle : const_cycles) {
-        ret.push_back(const_cast<Cycle*>(cycle));
+    for (const Ring* ring : const_rings) {
+        ret.push_back(const_cast<Ring*>(ring));
     }
 
     return ret;
 }
 
-std::vector<const Cycle*> Polygon::cycles() const {
-    std::vector<const Cycle*> ret;
-    ret.reserve(1 + inner_cycles.size());
+std::vector<const Ring*> Polygon::rings() const {
+    std::vector<const Ring*> ret;
+    ret.reserve(1 + inner_rings.size());
 
-    ret.push_back(&outer_cycle);
-    for (const Cycle& inner_cycle : inner_cycles) {
-        ret.push_back(&inner_cycle);
+    ret.push_back(&outer_ring);
+    for (const Ring& inner_ring : inner_rings) {
+        ret.push_back(&inner_ring);
     }
 
     return ret;
 }
 
 double Polygon::area() const {
-    double ret = outer_cycle.signedArea();
-    for (const Cycle& inner_cycle : inner_cycles) {
-        ret += inner_cycle.signedArea();
+    double ret = outer_ring.signedArea();
+    for (const Ring& inner_ring : inner_rings) {
+        ret += inner_ring.signedArea();
     }
     return ret;
 }
 
 bool Polygon::operator==(const Polygon& other) const {
-    return outer_cycle == other.outer_cycle && inner_cycles == other.inner_cycles;
+    return outer_ring == other.outer_ring && inner_rings == other.inner_rings;
 }
 
 Rectangle::Rectangle(Point lower_left, Point upper_right)
     : lower_left(lower_left), upper_right(upper_right) {}
 
-Cycle Rectangle::cycle() const {
+Ring Rectangle::ring() const {
     Point lower_right(upper_right.x, lower_left.y);
     Point upper_left(lower_left.x, upper_right.y);
-    return Cycle({lower_left, lower_right, upper_right, upper_left});
+    return Ring({lower_left, lower_right, upper_right, upper_left});
 }
 
 Polygon Rectangle::polygon() const {
-    return Polygon(cycle());
+    return Polygon(ring());
 }
 
 bool Rectangle::contains(const Point& p) const {
@@ -115,13 +115,13 @@ bool Rectangle::contains(const Segment& s) const {
 }
 
 bool Rectangle::contains(const Polygon& polygon) const {
-    for (const Point& point : polygon.outer_cycle.points) {
+    for (const Point& point : polygon.outer_ring.points) {
         if (!contains(point)) {
             return false;
         }
     }
-    for (const Cycle& inner_cycle : polygon.inner_cycles) {
-        for (const Point& point : inner_cycle.points) {
+    for (const Ring& inner_ring : polygon.inner_rings) {
+        for (const Point& point : inner_ring.points) {
             if (!contains(point)) {
                 return false;
             }

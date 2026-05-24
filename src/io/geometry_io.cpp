@@ -46,9 +46,9 @@ YAML::Node emitPoint(const Point& p) {
     return node;
 }
 
-Cycle parseCycle(const YAML::Node& node) {
+Ring parseRing(const YAML::Node& node) {
     if (!node.IsSequence()) {
-        throw std::runtime_error("Cycle must be a list of points");
+        throw std::runtime_error("Ring must be a list of points");
     }
 
     std::vector<Point> points;
@@ -58,13 +58,13 @@ Cycle parseCycle(const YAML::Node& node) {
         points.push_back(parsePoint(pointNode));
     }
 
-    return Cycle(std::move(points));
+    return Ring(std::move(points));
 }
 
-YAML::Node emitCycle(const Cycle& cycle) {
+YAML::Node emitRing(const Ring& ring) {
     YAML::Node node;
 
-    for (const Point& point : cycle.points) {
+    for (const Point& point : ring.points) {
         node.push_back(emitPoint(point));
     }
 
@@ -89,31 +89,31 @@ YAML::Node emitSegment(const Segment& segment) {
 
 Polygon parsePolygon(const YAML::Node& node) {
     if (!node["outer"]) {
-        throw std::runtime_error("Polygon is missing required 'outer' cycle");
+        throw std::runtime_error("Polygon is missing required 'outer' ring");
     }
 
-    Cycle outer_cycle = parseCycle(node["outer"]);
-    std::vector<Cycle> inner_cycles;
+    Ring outer_ring = parseRing(node["outer"]);
+    std::vector<Ring> inner_rings;
 
     if (node["holes"]) {
         for (const auto& holeNode : node["holes"]) {
-            inner_cycles.push_back(parseCycle(holeNode));
+            inner_rings.push_back(parseRing(holeNode));
         }
     }
 
-    return Polygon(std::move(outer_cycle), std::move(inner_cycles));
+    return Polygon(std::move(outer_ring), std::move(inner_rings));
 }
 
 YAML::Node emitPolygon(const Polygon& polygon) {
     YAML::Node node;
 
-    node["outer"] = emitCycle(polygon.outer_cycle);
+    node["outer"] = emitRing(polygon.outer_ring);
 
-    if (!polygon.inner_cycles.empty()) {
+    if (!polygon.inner_rings.empty()) {
         YAML::Node holes;
 
-        for (const Cycle& inner_cycle : polygon.inner_cycles) {
-            holes.push_back(emitCycle(inner_cycle));
+        for (const Ring& inner_ring : polygon.inner_rings) {
+            holes.push_back(emitRing(inner_ring));
         }
 
         node["holes"] = holes;

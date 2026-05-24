@@ -54,7 +54,7 @@ std::vector<Segment> randomSegmentsPython(int count, std::optional<unsigned int>
 } // namespace
 
 void bindAlgorithms(py::module_& module) {
-    module.def("assemble_cycles", &assembleCycles, py::arg("segments"));
+    module.def("assemble_rings", &assembleRings, py::arg("segments"));
     module.def("assemble_polygons", &assemblePolygons, py::arg("segments"));
     module.def("convex_hull", &convexHull, py::arg("points"));
     module.def("line_segment_intersection", &lineSegmentIntersectionPython, py::arg("segments"),

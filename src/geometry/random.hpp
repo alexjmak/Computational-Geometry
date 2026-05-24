@@ -5,7 +5,7 @@
 #include <random>
 #include <vector>
 
-class Cycle;
+class Ring;
 class Segment;
 
 /// \brief Generate a repeatable set of random 2D points.
@@ -35,6 +35,6 @@ std::vector<Segment> randomSegments(int num_segments, int min_length = 1, int ma
 /// \param max_c The maximum coordinate value.
 /// \param rng The random number generator used to make generation repeatable.
 /// \returns The convex hull of the generated point sample.
-Cycle randomConvexPolygon(int n, int min_c = 10, int max_c = 100, std::mt19937* rng = nullptr);
+Ring randomConvexPolygon(int n, int min_c = 10, int max_c = 100, std::mt19937* rng = nullptr);
 
 #endif // RANDOM_HPP

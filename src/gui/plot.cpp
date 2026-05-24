@@ -40,7 +40,7 @@ void ensureQApplication() {
 } // namespace
 
 Plot::Plot(const std::string& title, const std::string& x_label, const std::string& y_label)
-    : chart(nullptr), chartView(nullptr), min_x(), max_x(), min_y(), max_y(), cycle_fills(),
+    : chart(nullptr), chartView(nullptr), min_x(), max_x(), min_y(), max_y(), ring_fills(),
       segment_arrows() {
     chart = new QChart();
     chart->setTitle(QString::fromStdString(title));
@@ -102,54 +102,54 @@ void Plot::addSegmentArrow(const Segment& segment, const std::string& color, int
     segment_arrows.push_back({segment, arrow_item});
 }
 
-void Plot::addCycle(const Cycle& cycle, const std::string& face_color,
-                    const std::string& edge_color, double alpha) {
-    if (cycle.points.empty())
+void Plot::addRing(const Ring& ring, const std::string& face_color, const std::string& edge_color,
+                   double alpha) {
+    if (ring.points.empty())
         return;
-    addCycleBoundary(cycle, edge_color);
-    addCycleFill({cycle.points}, face_color, alpha);
+    addRingBoundary(ring, edge_color);
+    addRingFill({ring.points}, face_color, alpha);
     updateAxes();
 }
 
 void Plot::addPolygon(const Polygon& polygon, const std::string& face_color,
                       const std::string& edge_color, double alpha) {
-    std::vector<std::vector<Point>> fill_cycles;
-    fill_cycles.push_back(polygon.outer_cycle.points);
-    addCycleBoundary(polygon.outer_cycle, edge_color);
+    std::vector<std::vector<Point>> fill_rings;
+    fill_rings.push_back(polygon.outer_ring.points);
+    addRingBoundary(polygon.outer_ring, edge_color);
 
-    for (const Cycle& inner_cycle : polygon.inner_cycles) {
-        fill_cycles.push_back(inner_cycle.points);
-        addCycleBoundary(inner_cycle, edge_color);
+    for (const Ring& inner_ring : polygon.inner_rings) {
+        fill_rings.push_back(inner_ring.points);
+        addRingBoundary(inner_ring, edge_color);
     }
 
-    addCycleFill(fill_cycles, face_color, alpha);
+    addRingFill(fill_rings, face_color, alpha);
     updateAxes();
 }
 
-void Plot::addCycleBoundary(const Cycle& cycle, const std::string& edge_color) {
-    if (cycle.points.empty())
+void Plot::addRingBoundary(const Ring& ring, const std::string& edge_color) {
+    if (ring.points.empty())
         return;
     QLineSeries* series = new QLineSeries();
     series->setColor(QColor(QString::fromStdString(edge_color)));
-    for (const auto& p : cycle.points) {
+    for (const auto& p : ring.points) {
         series->append(boost::rational_cast<double>(p.x), boost::rational_cast<double>(p.y));
         includePoint(p);
     }
-    // Close the cycle
-    series->append(boost::rational_cast<double>(cycle.points[0].x),
-                   boost::rational_cast<double>(cycle.points[0].y));
+    // Close the ring
+    series->append(boost::rational_cast<double>(ring.points[0].x),
+                   boost::rational_cast<double>(ring.points[0].y));
     chart->addSeries(series);
 }
 
-void Plot::addCycleFill(const std::vector<std::vector<Point>>& cycles,
-                        const std::string& face_color, double alpha) {
+void Plot::addRingFill(const std::vector<std::vector<Point>>& rings, const std::string& face_color,
+                       double alpha) {
     QColor fill_color(QString::fromStdString(face_color));
     fill_color.setAlphaF(std::clamp(alpha, 0.0, 1.0));
     QGraphicsPathItem* fill_item = new QGraphicsPathItem(chart);
     fill_item->setBrush(QBrush(fill_color));
     fill_item->setPen(Qt::NoPen);
     fill_item->setZValue(-1.0);
-    cycle_fills.push_back({cycles, fill_item});
+    ring_fills.push_back({rings, fill_item});
 }
 
 void Plot::setDocument(const Document& document) {
@@ -169,10 +169,10 @@ void Plot::setDocument(const Document& document) {
 
 void Plot::clear() {
     chart->removeAllSeries();
-    for (CycleFill& fill : cycle_fills) {
+    for (RingFill& fill : ring_fills) {
         delete fill.item;
     }
-    cycle_fills.clear();
+    ring_fills.clear();
     for (SegmentArrow& arrow : segment_arrows) {
         delete arrow.item;
     }
@@ -233,23 +233,22 @@ void Plot::updateAxes() {
 }
 
 void Plot::updateOverlays() {
-    for (CycleFill& fill : cycle_fills) {
+    for (RingFill& fill : ring_fills) {
         QPainterPath path;
         path.setFillRule(Qt::OddEvenFill);
 
-        for (const std::vector<Point>& cycle : fill.cycles) {
-            if (cycle.empty()) {
+        for (const std::vector<Point>& ring : fill.rings) {
+            if (ring.empty()) {
                 continue;
             }
 
-            QPointF first_point =
-                chart->mapToPosition(QPointF(boost::rational_cast<double>(cycle[0].x),
-                                             boost::rational_cast<double>(cycle[0].y)));
+            QPointF first_point = chart->mapToPosition(QPointF(
+                boost::rational_cast<double>(ring[0].x), boost::rational_cast<double>(ring[0].y)));
             path.moveTo(first_point);
 
-            for (std::size_t i = 1; i < cycle.size(); ++i) {
-                QPointF data_point(boost::rational_cast<double>(cycle[i].x),
-                                   boost::rational_cast<double>(cycle[i].y));
+            for (std::size_t i = 1; i < ring.size(); ++i) {
+                QPointF data_point(boost::rational_cast<double>(ring[i].x),
+                                   boost::rational_cast<double>(ring[i].y));
                 path.lineTo(chart->mapToPosition(data_point));
             }
             path.closeSubpath();
@@ -259,12 +258,12 @@ void Plot::updateOverlays() {
     }
 
     for (SegmentArrow& arrow : segment_arrows) {
-        const QPointF start = chart->mapToPosition(
-            QPointF(boost::rational_cast<double>(arrow.segment.start.x),
-                    boost::rational_cast<double>(arrow.segment.start.y)));
-        const QPointF end = chart->mapToPosition(
-            QPointF(boost::rational_cast<double>(arrow.segment.end.x),
-                    boost::rational_cast<double>(arrow.segment.end.y)));
+        const QPointF start =
+            chart->mapToPosition(QPointF(boost::rational_cast<double>(arrow.segment.start.x),
+                                         boost::rational_cast<double>(arrow.segment.start.y)));
+        const QPointF end =
+            chart->mapToPosition(QPointF(boost::rational_cast<double>(arrow.segment.end.x),
+                                         boost::rational_cast<double>(arrow.segment.end.y)));
 
         const QPointF direction = end - start;
         const double length = std::hypot(direction.x(), direction.y());

@@ -51,7 +51,7 @@ std::vector<Segment> randomSegments(int num_segments, int min_length, int max_le
     return segs;
 }
 
-Cycle randomConvexPolygon(int n, int min_c, int max_c, std::mt19937* rng) {
+Ring randomConvexPolygon(int n, int min_c, int max_c, std::mt19937* rng) {
     if (!rng) {
         static std::mt19937 default_rng(std::random_device{}());
         rng = &default_rng;

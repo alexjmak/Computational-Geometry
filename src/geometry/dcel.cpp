@@ -18,7 +18,7 @@
 
 namespace {
 
-/// \brief Disjoint-set structure for grouping boundary cycles that bound the same face.
+/// \brief Disjoint-set structure for grouping boundary rings that bound the same face.
 class UnionFind {
   public:
     /// \brief Create a new singleton set.
@@ -80,17 +80,17 @@ class UnionFind {
 /// \brief Builder metadata for one directed DCEL half edge.
 struct DCELBuilderHalfEdge {
     /// \brief Initialize metadata for an unassigned builder half-edge.
-    DCELBuilderHalfEdge() : boundary_cycle(DCEL::npos), is_input_cycle_edge(false) {}
+    DCELBuilderHalfEdge() : boundary_ring(DCEL::npos), is_input_ring_edge(false) {}
 
-    std::size_t boundary_cycle; ///< Index of the boundary cycle containing this half-edge.
-    bool is_input_cycle_edge;   ///< True if this half-edge belongs to an input cycle.
+    std::size_t boundary_ring; ///< Index of the boundary ring containing this half-edge.
+    bool is_input_ring_edge;   ///< True if this half-edge belongs to an input ring.
 };
 
-/// \brief Builder metadata for one directed DCEL boundary cycle.
-struct DCELBuilderCycle {
+/// \brief Builder metadata for one directed DCEL boundary ring.
+struct DCELBuilderRing {
 
-    std::size_t leftmost_half_edge; ///< Representative half-edge at the cycle's leftmost vertex.
-    bool is_outer;                  ///< True when the cycle is an outer face boundary.
+    std::size_t leftmost_half_edge; ///< Representative half-edge at the ring's leftmost vertex.
+    bool is_outer;                  ///< True when the ring is an outer face boundary.
 };
 
 /// \brief Incremental builder for constructing a DCEL from polygon boundaries.
@@ -100,75 +100,75 @@ class DCELCreator {
     /// \param dcel The empty DCEL to populate.
     explicit DCELCreator(DCEL dcel);
 
-    /// \brief Build a DCEL from polygon boundary cycles.
-    /// \param cycles The cycles whose boundaries should be inserted.
+    /// \brief Build a DCEL from polygon boundary rings.
+    /// \param rings The rings whose boundaries should be inserted.
     /// \returns A populated DCEL.
-    DCEL build(const std::vector<const Cycle*>& cycles);
+    DCEL build(const std::vector<const Ring*>& rings);
 
   private:
     DCEL dcel;                                        ///< DCEL being incrementally constructed.
     std::unordered_map<Point, std::size_t> point_map; ///< Maps geometric points to vertex indices.
     std::unordered_map<Segment, std::size_t> segment_map; ///< Maps directed segments to half-edges.
     std::vector<DCELBuilderHalfEdge> half_edges;          ///< Builder metadata for half-edges.
-    std::vector<DCELBuilderCycle> boundary_cycles;        ///< Builder metadata for directed cycles.
-    UnionFind cycle_union_find; ///< Groups boundary cycles that bound the same face.
+    std::vector<DCELBuilderRing> boundary_rings;          ///< Builder metadata for directed rings.
+    UnionFind ring_union_find; ///< Groups boundary rings that bound the same face.
 
     /// \brief Reserve storage for vertices and half-edges.
     /// \param polygons The polygons that will be inserted.
-    void reserve(const std::vector<const Cycle*>& cycles);
+    void reserve(const std::vector<const Ring*>& rings);
 
-    /// \brief Add a boundary cycle.
-    /// \param cycle The boundary cycle to add.
-    /// \param is_input_cycle True if the cycle came from caller input.
-    void processBoundaryCycle(const Cycle& cycle, bool is_input_cycle);
+    /// \brief Add a boundary ring.
+    /// \param ring The boundary ring to add.
+    /// \param is_input_ring True if the ring came from caller input.
+    void processBoundaryRing(const Ring& ring, bool is_input_ring);
 
-    /// \brief Assemble directed half-edges into closed non-input boundary cycles.
-    /// \param edges Half-edge indices that are not part of an input boundary cycle.
-    /// \returns Closed cycles formed by walking the supplied half-edges.
-    std::vector<Cycle> assembleBoundaryCycle(const std::vector<std::size_t>& edges);
+    /// \brief Assemble directed half-edges into closed non-input boundary rings.
+    /// \param edges Half-edge indices that are not part of an input boundary ring.
+    /// \returns Closed rings formed by walking the supplied half-edges.
+    std::vector<Ring> assembleBoundaryRing(const std::vector<std::size_t>& edges);
 
-    /// \brief Register builder metadata for a linked boundary cycle.
-    /// \param half_edge_indices Ordered half-edge indices around the boundary cycle.
-    /// \param isOuter True if the cycle is counter-clockwise and bounds a finite face.
-    /// \returns The builder boundary-cycle index.
-    std::size_t addBoundaryCycle(const std::vector<std::size_t>& half_edge_indices, bool isOuter);
+    /// \brief Register builder metadata for a linked boundary ring.
+    /// \param half_edge_indices Ordered half-edge indices around the boundary ring.
+    /// \param isOuter True if the ring is counter-clockwise and bounds a finite face.
+    /// \returns The builder boundary-ring index.
+    std::size_t addBoundaryRing(const std::vector<std::size_t>& half_edge_indices, bool isOuter);
 
-    /// \brief Create DCEL face records from the boundary-cycle connectivity graph.
+    /// \brief Create DCEL face records from the boundary-ring connectivity graph.
     void createFaces();
 
-    /// \brief Union boundary cycles that bound the same face.
-    /// \param unbounded_cycle_index The union-find node for the imaginary unbounded boundary.
-    void groupBoundaryCyclesByFace(std::size_t unbounded_cycle_index);
+    /// \brief Union boundary rings that bound the same face.
+    /// \param unbounded_ring_index The union-find node for the imaginary unbounded boundary.
+    void groupBoundaryRingsByFace(std::size_t unbounded_ring_index);
 
-    /// \brief Create the initial mapping from cycle roots to face indices.
-    /// \param unbounded_cycle_index The union-find node for the imaginary unbounded boundary.
+    /// \brief Create the initial mapping from ring roots to face indices.
+    /// \param unbounded_ring_index The union-find node for the imaginary unbounded boundary.
     /// \returns A map from union-find roots to DCEL face indices, seeded with the unbounded face.
     std::unordered_map<std::size_t, std::size_t>
-    createFaceByCycleRoot(std::size_t unbounded_cycle_index);
+    createFaceByRingRoot(std::size_t unbounded_ring_index);
 
-    /// \brief Resolve or create the DCEL face for a cycle-root group.
-    /// \param root_cycle_index The union-find root representing a face group.
-    /// \param root_cycle_to_face Map from cycle roots to existing face indices.
-    /// \returns The DCEL face index for the cycle-root group.
-    std::size_t getOrCreateFace(std::size_t root_cycle_index,
-                                std::unordered_map<std::size_t, std::size_t>& root_cycle_to_face);
+    /// \brief Resolve or create the DCEL face for a ring-root group.
+    /// \param root_ring_index The union-find root representing a face group.
+    /// \param root_ring_to_face Map from ring roots to existing face indices.
+    /// \returns The DCEL face index for the ring-root group.
+    std::size_t getOrCreateFace(std::size_t root_ring_index,
+                                std::unordered_map<std::size_t, std::size_t>& root_ring_to_face);
 
-    /// \brief Attach a boundary cycle representative to a DCEL face.
-    /// \param boundary_cycle The boundary cycle metadata to attach.
+    /// \brief Attach a boundary ring representative to a DCEL face.
+    /// \param boundary_ring The boundary ring metadata to attach.
     /// \param face_index The face receiving the boundary component.
-    void addBoundaryCycleToFace(const DCELBuilderCycle& boundary_cycle, std::size_t face_index);
+    void addBoundaryRingToFace(const DCELBuilderRing& boundary_ring, std::size_t face_index);
 
-    /// \brief Assign a face index to every half-edge in a boundary cycle.
-    /// \param boundary_cycle The boundary cycle whose half-edges should be assigned.
-    /// \param face_index The face incident to the boundary cycle.
-    void assignFaceToBoundaryCycle(const DCELBuilderCycle& boundary_cycle, std::size_t face_index);
+    /// \brief Assign a face index to every half-edge in a boundary ring.
+    /// \param boundary_ring The boundary ring whose half-edges should be assigned.
+    /// \param face_index The face incident to the boundary ring.
+    void assignFaceToBoundaryRing(const DCELBuilderRing& boundary_ring, std::size_t face_index);
 
-    /// \brief Link the next/previous pointers for a directed boundary cycle.
-    /// \param half_edge_indices Ordered half-edge indices for the directed cycle.
-    void linkBoundaryCycleHalfEdges(const std::vector<std::size_t>& half_edge_indices);
+    /// \brief Link the next/previous pointers for a directed boundary ring.
+    /// \param half_edge_indices Ordered half-edge indices for the directed ring.
+    void linkBoundaryRingHalfEdges(const std::vector<std::size_t>& half_edge_indices);
 
-    /// \brief Find the half-edge whose origin is the leftmost vertex in a cycle.
-    /// \param half_edge_indices Ordered half-edge indices for the cycle.
+    /// \brief Find the half-edge whose origin is the leftmost vertex in a ring.
+    /// \param half_edge_indices Ordered half-edge indices for the ring.
     /// \returns The half-edge index with the lexicographically smallest origin.
     std::size_t leftmostHalfEdge(const std::vector<std::size_t>& half_edge_indices);
 
@@ -196,11 +196,11 @@ class DCELCreator {
     /// \returns The index of the newly created half-edge.
     std::size_t createHalfEdge(const Segment& segment);
 
-    /// \brief Choose the next non-input half-edge while assembling a boundary cycle.
+    /// \brief Choose the next non-input half-edge while assembling a boundary ring.
     /// \param prev_edge_idx The half-edge used to reach the current vertex, or DCEL::npos if the
     /// walk is starting.
     /// \param next_edges Candidate outgoing half-edges from the current vertex.
-    /// \param visited Set of half-edges already consumed by assembled boundary cycles.
+    /// \param visited Set of half-edges already consumed by assembled boundary rings.
     /// \returns The selected outgoing half-edge, or DCEL::npos if no unvisited candidate remains.
     std::size_t nextNonInputBoundaryEdge(std::size_t prev_edge_idx,
                                          const std::vector<std::size_t>& next_edges,
@@ -224,8 +224,8 @@ std::size_t DCELCreator::nextNonInputBoundaryEdge(std::size_t prev_edge_idx,
         Vect2 prev_reversed = dcel.originOf(prev_edge) - dcel.originOf(prev_twin_edge);
 
         DCELBuilderHalfEdge prev_twin_builder_edge = half_edges[prev_edge.twin];
-        DCELBuilderCycle prev_twin_cycle = boundary_cycles[prev_twin_builder_edge.boundary_cycle];
-        bool choose_clockwise_turn = !prev_twin_cycle.is_outer;
+        DCELBuilderRing prev_twin_ring = boundary_rings[prev_twin_builder_edge.boundary_ring];
+        bool choose_clockwise_turn = !prev_twin_ring.is_outer;
 
         double best_edge_angle = std::numeric_limits<double>::max();
         for (const std::size_t half_edge_index : next_edges) {
@@ -269,7 +269,7 @@ std::size_t DCELCreator::nextNonInputBoundaryEdge(std::size_t prev_edge_idx,
     return next_edge;
 }
 
-std::vector<Cycle> DCELCreator::assembleBoundaryCycle(const std::vector<std::size_t>& edges) {
+std::vector<Ring> DCELCreator::assembleBoundaryRing(const std::vector<std::size_t>& edges) {
     std::unordered_map<std::size_t, std::vector<std::size_t>> origin_to_edge;
     for (const std::size_t edge_index : edges) {
         DCEL::HalfEdge half_edge = dcel.half_edges[edge_index];
@@ -279,8 +279,8 @@ std::vector<Cycle> DCELCreator::assembleBoundaryCycle(const std::vector<std::siz
 
     std::unordered_set<std::size_t> visited;
 
-    std::vector<Cycle> cycles;
-    std::vector<Point> curr_cycle_pts;
+    std::vector<Ring> rings;
+    std::vector<Point> curr_ring_pts;
 
     for (const std::size_t half_edge_index : edges) {
         if (visited.contains(half_edge_index)) {
@@ -296,18 +296,18 @@ std::vector<Cycle> DCELCreator::assembleBoundaryCycle(const std::vector<std::siz
             // find next unvisited edge or if all visited then break
             auto found = origin_to_edge.find(curr);
             if (found == origin_to_edge.end()) {
-                throw std::logic_error("Boundary cycle reached vertex with no outgoing edge");
+                throw std::logic_error("Boundary ring reached vertex with no outgoing edge");
             }
 
             std::size_t curr_edge_idx =
                 nextNonInputBoundaryEdge(prev_edge_idx, found->second, visited);
             if (curr_edge_idx == DCEL::npos) {
-                throw std::logic_error("Boundary cycle is unclosed");
+                throw std::logic_error("Boundary ring is unclosed");
             }
 
             prev_edge_idx = curr_edge_idx;
 
-            curr_cycle_pts.push_back(curr_pt);
+            curr_ring_pts.push_back(curr_pt);
 
             DCEL::HalfEdge twin_edge = dcel.twinOf(dcel.half_edges[curr_edge_idx]);
             std::size_t next = twin_edge.origin;
@@ -316,33 +316,33 @@ std::vector<Cycle> DCELCreator::assembleBoundaryCycle(const std::vector<std::siz
             curr_pt = next_pt;
         } while (curr != first);
 
-        cycles.emplace_back(Cycle(std::move(curr_cycle_pts)));
-        curr_cycle_pts.clear();
+        rings.emplace_back(Ring(std::move(curr_ring_pts)));
+        curr_ring_pts.clear();
     }
 
-    return cycles;
+    return rings;
 }
 
-DCEL DCELCreator::build(const std::vector<const Cycle*>& cycles) {
-    reserve(cycles);
+DCEL DCELCreator::build(const std::vector<const Ring*>& rings) {
+    reserve(rings);
 
-    for (const Cycle* cycle : cycles) {
-        processBoundaryCycle(*cycle, true);
+    for (const Ring* ring : rings) {
+        processBoundaryRing(*ring, true);
     }
 
     // collectNonInputEdges();
     std::vector<std::size_t> non_input_edges;
     for (std::size_t i = 0; i < half_edges.size(); ++i) {
         DCELBuilderHalfEdge half_edge = half_edges[i];
-        if (!half_edge.is_input_cycle_edge) {
+        if (!half_edge.is_input_ring_edge) {
             non_input_edges.push_back(i);
         }
     }
 
-    std::vector<Cycle> non_input_cycles = assembleBoundaryCycle(non_input_edges);
+    std::vector<Ring> non_input_rings = assembleBoundaryRing(non_input_edges);
 
-    for (const Cycle& non_input_cycle : non_input_cycles) {
-        processBoundaryCycle(non_input_cycle, false);
+    for (const Ring& non_input_ring : non_input_rings) {
+        processBoundaryRing(non_input_ring, false);
     }
 
     createFaces();
@@ -366,7 +366,7 @@ std::size_t DCELCreator::findNearestHalfEdgeToLeft(const Point& point) {
         Segment half_edge_segment = dcel.segmentOf(half_edge);
         if (half_edge_segment.start.y == point.y && half_edge_segment.end.y == point.y) {
             // A horizontal edge ending at the query point is the nearest possible left hit. Use
-            // the opposite direction so point-touching exterior cycles union with each other.
+            // the opposite direction so point-touching exterior rings union with each other.
             const DCEL::HalfEdge& twin_half_edge = dcel.twinOf(half_edge);
             const Point& half_edge_origin = dcel.originOf(half_edge);
             const Point& twin_origin = dcel.originOf(twin_half_edge);
@@ -409,85 +409,85 @@ std::size_t DCELCreator::findNearestHalfEdgeToLeft(const Point& point) {
 }
 
 void DCELCreator::createFaces() {
-    const std::size_t unbounded_cycle_index = cycle_union_find.addSet();
+    const std::size_t unbounded_ring_index = ring_union_find.addSet();
 
-    groupBoundaryCyclesByFace(unbounded_cycle_index);
+    groupBoundaryRingsByFace(unbounded_ring_index);
 
-    std::unordered_map<std::size_t, std::size_t> root_cycle_to_face =
-        createFaceByCycleRoot(unbounded_cycle_index);
+    std::unordered_map<std::size_t, std::size_t> root_ring_to_face =
+        createFaceByRingRoot(unbounded_ring_index);
 
-    for (std::size_t cycle_index = 0; cycle_index < boundary_cycles.size(); ++cycle_index) {
-        const DCELBuilderCycle& boundary_cycle = boundary_cycles[cycle_index];
-        const std::size_t root_cycle_index = cycle_union_find.find(cycle_index);
-        const std::size_t face_index = getOrCreateFace(root_cycle_index, root_cycle_to_face);
+    for (std::size_t ring_index = 0; ring_index < boundary_rings.size(); ++ring_index) {
+        const DCELBuilderRing& boundary_ring = boundary_rings[ring_index];
+        const std::size_t root_ring_index = ring_union_find.find(ring_index);
+        const std::size_t face_index = getOrCreateFace(root_ring_index, root_ring_to_face);
 
-        addBoundaryCycleToFace(boundary_cycle, face_index);
+        addBoundaryRingToFace(boundary_ring, face_index);
     }
 }
 
-void DCELCreator::groupBoundaryCyclesByFace(const std::size_t unbounded_cycle_index) {
-    // There is an arc between two cycles if and only if one of the cycles is the boundary of a hole
-    // and the other cycle has a half-edge immediately to the left of the leftmost vertex of that
-    // hole cycle.
-    for (std::size_t cycle_index = 0; cycle_index < boundary_cycles.size(); ++cycle_index) {
-        const DCELBuilderCycle& boundary_cycle = boundary_cycles[cycle_index];
-        if (boundary_cycle.is_outer) {
+void DCELCreator::groupBoundaryRingsByFace(const std::size_t unbounded_ring_index) {
+    // There is an arc between two rings if and only if one of the rings is the boundary of a hole
+    // and the other ring has a half-edge immediately to the left of the leftmost vertex of that
+    // hole ring.
+    for (std::size_t ring_index = 0; ring_index < boundary_rings.size(); ++ring_index) {
+        const DCELBuilderRing& boundary_ring = boundary_rings[ring_index];
+        if (boundary_ring.is_outer) {
             continue;
         }
 
-        std::size_t leftmost_half_edge_index = boundary_cycle.leftmost_half_edge;
+        std::size_t leftmost_half_edge_index = boundary_ring.leftmost_half_edge;
         DCEL::HalfEdge& leftmost_half_edge = dcel.half_edges[leftmost_half_edge_index];
         Point& leftmost_point = static_cast<Point&>(dcel.originOf(leftmost_half_edge));
         std::size_t nearest_left_half_edge = findNearestHalfEdgeToLeft(leftmost_point);
 
         if (nearest_left_half_edge == DCEL::npos) {
-            cycle_union_find.unite(cycle_index, unbounded_cycle_index);
+            ring_union_find.unite(ring_index, unbounded_ring_index);
         } else {
-            std::size_t nearest_left_cycle = half_edges[nearest_left_half_edge].boundary_cycle;
-            assert(nearest_left_cycle != DCEL::npos);
-            assert(nearest_left_cycle != cycle_index);
-            cycle_union_find.unite(cycle_index, nearest_left_cycle);
+            std::size_t nearest_left_ring = half_edges[nearest_left_half_edge].boundary_ring;
+            assert(nearest_left_ring != DCEL::npos);
+            assert(nearest_left_ring != ring_index);
+            ring_union_find.unite(ring_index, nearest_left_ring);
         }
     }
 }
 
 std::unordered_map<std::size_t, std::size_t>
-DCELCreator::createFaceByCycleRoot(const std::size_t unbounded_cycle_index) {
-    // Group cycles into faces based on which cycles are connected by unions.
-    std::unordered_map<std::size_t, std::size_t> root_cycle_to_face;
+DCELCreator::createFaceByRingRoot(const std::size_t unbounded_ring_index) {
+    // Group rings into faces based on which rings are connected by unions.
+    std::unordered_map<std::size_t, std::size_t> root_ring_to_face;
 
     // First add the unbounded face
     assert(dcel.faces.size() == DCEL::unbounded_face_index);
     dcel.faces.emplace_back(DCEL::Face()); // Start with the unbounded face.
     dcel.faces[DCEL::unbounded_face_index].outer_component = DCEL::npos;
-    root_cycle_to_face[cycle_union_find.find(unbounded_cycle_index)] = DCEL::unbounded_face_index;
+    root_ring_to_face[ring_union_find.find(unbounded_ring_index)] = DCEL::unbounded_face_index;
 
-    return root_cycle_to_face;
+    return root_ring_to_face;
 }
 
 std::size_t
-DCELCreator::getOrCreateFace(const std::size_t root_cycle_index,
-                             std::unordered_map<std::size_t, std::size_t>& root_cycle_to_face) {
-    auto found = root_cycle_to_face.find(root_cycle_index);
-    if (found != root_cycle_to_face.end()) {
+DCELCreator::getOrCreateFace(const std::size_t root_ring_index,
+                             std::unordered_map<std::size_t, std::size_t>& root_ring_to_face) {
+    auto found = root_ring_to_face.find(root_ring_index);
+    if (found != root_ring_to_face.end()) {
         return found->second;
     }
 
     const std::size_t face_index = dcel.faces.size();
     dcel.faces.emplace_back(DCEL::Face());
-    root_cycle_to_face[root_cycle_index] = face_index;
+    root_ring_to_face[root_ring_index] = face_index;
     return face_index;
 }
 
-void DCELCreator::addBoundaryCycleToFace(const DCELBuilderCycle& boundary_cycle,
-                                         const std::size_t face_index) {
+void DCELCreator::addBoundaryRingToFace(const DCELBuilderRing& boundary_ring,
+                                        const std::size_t face_index) {
 
     // Assign this face to every half-edge around the boundary component.
-    assignFaceToBoundaryCycle(boundary_cycle, face_index);
+    assignFaceToBoundaryRing(boundary_ring, face_index);
 
     // Store one representative half-edge for this boundary component.
-    const std::size_t half_edge_index = boundary_cycle.leftmost_half_edge;
-    if (boundary_cycle.is_outer) {
+    const std::size_t half_edge_index = boundary_ring.leftmost_half_edge;
+    if (boundary_ring.is_outer) {
         assert(dcel.faces[face_index].outer_component == DCEL::npos);
         dcel.faces[face_index].outer_component = half_edge_index;
     } else {
@@ -495,9 +495,9 @@ void DCELCreator::addBoundaryCycleToFace(const DCELBuilderCycle& boundary_cycle,
     }
 }
 
-void DCELCreator::assignFaceToBoundaryCycle(const DCELBuilderCycle& boundary_cycle,
-                                            const std::size_t face_index) {
-    const std::size_t start = boundary_cycle.leftmost_half_edge;
+void DCELCreator::assignFaceToBoundaryRing(const DCELBuilderRing& boundary_ring,
+                                           const std::size_t face_index) {
+    const std::size_t start = boundary_ring.leftmost_half_edge;
     std::size_t current = start;
     for (std::size_t i = 0; i < dcel.half_edges.size(); ++i) {
         dcel.half_edges[current].face = face_index;
@@ -507,21 +507,21 @@ void DCELCreator::assignFaceToBoundaryCycle(const DCELBuilderCycle& boundary_cyc
         }
     }
 
-    assert(false && "Boundary cycle does not close while assigning face");
+    assert(false && "Boundary ring does not close while assigning face");
 }
 
-void DCELCreator::reserve(const std::vector<const Cycle*>& cycles) {
+void DCELCreator::reserve(const std::vector<const Ring*>& rings) {
     std::size_t segment_count = 0;
-    std::size_t cycle_count = 0;
-    for (const Cycle* cycle : cycles) {
-        segment_count += cycle->points.size();
-        cycle_count++;
+    std::size_t ring_count = 0;
+    for (const Ring* ring : rings) {
+        segment_count += ring->points.size();
+        ring_count++;
     }
 
     dcel.points.reserve(segment_count * 2);
     dcel.half_edges.reserve(segment_count * 2);
     half_edges.reserve(segment_count * 2);
-    boundary_cycles.reserve(cycle_count * 2);
+    boundary_rings.reserve(ring_count * 2);
 }
 
 std::size_t DCELCreator::getOrCreatePoint(const Point& point) {
@@ -541,8 +541,8 @@ std::size_t DCELCreator::createHalfEdge(const Segment& segment) {
 
     dcel.half_edges.emplace_back(DCEL::HalfEdge(start_index));
 
-    // Initialize the half-edge cycle index to npos to indicate that it is not yet part of any
-    // cycle. We will set this to the correct cycle index in addCycle
+    // Initialize the half-edge ring index to npos to indicate that it is not yet part of any
+    // ring. We will set this to the correct ring index in addRing
     half_edges.push_back(DCELBuilderHalfEdge());
 
     const std::size_t half_edge_index = dcel.half_edges.size() - 1;
@@ -552,20 +552,20 @@ std::size_t DCELCreator::createHalfEdge(const Segment& segment) {
     return half_edge_index;
 }
 
-std::size_t DCELCreator::addBoundaryCycle(const std::vector<std::size_t>& half_edge_indices,
-                                          bool isOuter) {
-    const std::size_t cycle_index = boundary_cycles.size();
-    boundary_cycles.push_back({DCEL::npos, isOuter});
-    cycle_union_find.addSet();
+std::size_t DCELCreator::addBoundaryRing(const std::vector<std::size_t>& half_edge_indices,
+                                         bool isOuter) {
+    const std::size_t ring_index = boundary_rings.size();
+    boundary_rings.push_back({DCEL::npos, isOuter});
+    ring_union_find.addSet();
     // Add the half edge containing the leftmost origin vertex as the representative for each
-    // boundary cycle, which we will use to determine face connectivity.
+    // boundary ring, which we will use to determine face connectivity.
     const std::size_t leftmost_half_edge = leftmostHalfEdge(half_edge_indices);
-    boundary_cycles[cycle_index].leftmost_half_edge = leftmost_half_edge;
-    return cycle_index;
+    boundary_rings[ring_index].leftmost_half_edge = leftmost_half_edge;
+    return ring_index;
 }
 
-void DCELCreator::processBoundaryCycle(const Cycle& cycle, bool is_input_cycle) {
-    const std::vector<Segment> segments = cycle.segments();
+void DCELCreator::processBoundaryRing(const Ring& ring, bool is_input_ring) {
+    const std::vector<Segment> segments = ring.segments();
     if (segments.empty()) {
         return;
     }
@@ -574,8 +574,8 @@ void DCELCreator::processBoundaryCycle(const Cycle& cycle, bool is_input_cycle) 
     half_edge_indices.reserve(segments.size());
 
     for (const Segment& segment : segments) {
-        if (!is_input_cycle) {
-            // The segment should have been created when processing the input cycles
+        if (!is_input_ring) {
+            // The segment should have been created when processing the input rings
             assert(segment_map.contains(segment));
         }
 
@@ -583,19 +583,19 @@ void DCELCreator::processBoundaryCycle(const Cycle& cycle, bool is_input_cycle) 
         half_edge_indices.push_back(half_edge_index);
     }
 
-    linkBoundaryCycleHalfEdges(half_edge_indices);
+    linkBoundaryRingHalfEdges(half_edge_indices);
 
-    const std::size_t cycle_index = addBoundaryCycle(half_edge_indices, cycle.isOuter());
+    const std::size_t ring_index = addBoundaryRing(half_edge_indices, ring.isOuter());
 
     for (const std::size_t half_edge_index : half_edge_indices) {
-        half_edges[half_edge_index].boundary_cycle = cycle_index;
-        if (is_input_cycle) {
-            half_edges[half_edge_index].is_input_cycle_edge = true;
+        half_edges[half_edge_index].boundary_ring = ring_index;
+        if (is_input_ring) {
+            half_edges[half_edge_index].is_input_ring_edge = true;
         }
     }
 }
 
-void DCELCreator::linkBoundaryCycleHalfEdges(const std::vector<std::size_t>& half_edge_indices) {
+void DCELCreator::linkBoundaryRingHalfEdges(const std::vector<std::size_t>& half_edge_indices) {
     for (std::size_t i = 0; i < half_edge_indices.size(); ++i) {
         const std::size_t prev =
             half_edge_indices[(i + half_edge_indices.size() - 1) % half_edge_indices.size()];
@@ -710,14 +710,14 @@ Segment DCEL::segmentOf(const DCEL::HalfEdge& half_edge) const {
     return Segment(originOf(half_edge), originOf(twinOf(half_edge)));
 }
 
-Cycle DCEL::cycleOf(const HalfEdge& half_edge) const {
+Ring DCEL::ringOf(const HalfEdge& half_edge) const {
     std::vector<Point> points;
     const HalfEdge* current_half_edge = &half_edge;
     do {
         points.push_back(originOf(*current_half_edge));
         current_half_edge = &nextOf(*current_half_edge);
     } while (current_half_edge != &half_edge);
-    return Cycle(std::move(points));
+    return Ring(std::move(points));
 }
 
 std::optional<Polygon> DCEL::polygonOf(const Face& face) const {
@@ -728,46 +728,46 @@ std::optional<Polygon> DCEL::polygonOf(const Face& face) const {
     }
 
     const HalfEdge& outer_half_edge = half_edges[face.outer_component];
-    Cycle outer_cycle = cycleOf(outer_half_edge);
+    Ring outer_ring = ringOf(outer_half_edge);
 
-    std::vector<Cycle> inner_cycles;
+    std::vector<Ring> inner_rings;
     for (const std::size_t inner_component : face.inner_components) {
         const HalfEdge& inner_half_edge = half_edges[inner_component];
-        inner_cycles.push_back(cycleOf(inner_half_edge));
+        inner_rings.push_back(ringOf(inner_half_edge));
     }
 
-    return Polygon(std::move(outer_cycle), std::move(inner_cycles));
+    return Polygon(std::move(outer_ring), std::move(inner_rings));
 }
 
 DCEL DCEL::fromPolygons(const std::vector<Polygon>& polygons) {
-    std::vector<const Cycle*> cycles;
+    std::vector<const Ring*> rings;
     for (const Polygon& polygon : polygons) {
-        for (const Cycle* cycle : polygon.cycles()) {
-            cycles.push_back(cycle);
+        for (const Ring* ring : polygon.rings()) {
+            rings.push_back(ring);
         }
     }
-    return DCELCreator(DCEL()).build(cycles);
+    return DCELCreator(DCEL()).build(rings);
 }
 
-DCEL DCEL::fromCycles(const std::vector<const Cycle*>& cycles) {
-    return DCELCreator(DCEL()).build(cycles);
+DCEL DCEL::fromRings(const std::vector<const Ring*>& rings) {
+    return DCELCreator(DCEL()).build(rings);
 }
 
-DCEL DCEL::fromCycles(const std::vector<Cycle>& cycles) {
-    std::vector<const Cycle*> cycle_pointers;
-    for (const Cycle& cycle : cycles) {
-        cycle_pointers.push_back(&cycle);
+DCEL DCEL::fromRings(const std::vector<Ring>& rings) {
+    std::vector<const Ring*> ring_pointers;
+    for (const Ring& ring : rings) {
+        ring_pointers.push_back(&ring);
     }
-    return DCELCreator(DCEL()).build(cycle_pointers);
+    return DCELCreator(DCEL()).build(ring_pointers);
 }
 
 DCEL DCEL::fromSegments(const std::vector<Segment>& segments) {
-    std::vector<const Cycle*> cycles;
-    std::vector<Cycle> assembled_cycles = assembleCycles(segments);
-    for (const Cycle& cycle : assembled_cycles) {
-        cycles.push_back(&cycle);
+    std::vector<const Ring*> rings;
+    std::vector<Ring> assembled_rings = assembleRings(segments);
+    for (const Ring& ring : assembled_rings) {
+        rings.push_back(&ring);
     }
-    return DCELCreator(DCEL()).build(cycles);
+    return DCELCreator(DCEL()).build(rings);
 }
 
 const DCEL::Face& DCEL::unboundedFace() const {

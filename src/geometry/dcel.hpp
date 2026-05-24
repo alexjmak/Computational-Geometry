@@ -123,14 +123,14 @@ class DCEL {
     /// \returns The segment from the half-edge origin to its twin's origin.
     Segment segmentOf(const HalfEdge& half_edge) const;
 
-    /// \brief Convert a half-edge cycle into a geometric cycle.
-    /// \param half_edge The half-edge whose cycle should be converted.
-    /// \returns A cycle containing the vertices of the half-edge cycle.
-    Cycle cycleOf(const HalfEdge& half_edge) const;
+    /// \brief Convert a half-edge ring into a geometric ring.
+    /// \param half_edge The half-edge whose ring should be converted.
+    /// \returns A ring containing the vertices of the half-edge ring.
+    Ring ringOf(const HalfEdge& half_edge) const;
 
-    /// \brief Convert a face into a polygon by converting its outer and inner cycles.
+    /// \brief Convert a face into a polygon by converting its outer and inner rings.
     /// \param face The face to convert.
-    /// \returns A polygon with an outer cycle from the face's outer component and inner cycles
+    /// \returns A polygon with an outer ring from the face's outer component and inner rings
     /// from the face's inner components. The unbounded face returns std::nullopt.
     std::optional<Polygon> polygonOf(const Face& face) const;
 
@@ -142,22 +142,22 @@ class DCEL {
     /// \returns A face-indexed depth vector; unreachable faces keep DCEL::npos.
     std::vector<std::size_t> faceDepths() const;
 
-    /// \brief Build a DCEL from polygon boundary cycles.
+    /// \brief Build a DCEL from polygon boundary rings.
     /// \param polygons The polygons whose boundaries should populate the DCEL.
     /// \returns A DCEL containing vertices, half-edges, and faces for the polygons.
     static DCEL fromPolygons(const std::vector<Polygon>& polygons);
 
-    /// \brief Build a DCEL from boundary cycles.
-    /// \param cycles The boundary cycles to populate the DCEL.
-    /// \returns A DCEL containing vertices, half-edges, and faces for the cycles.
-    static DCEL fromCycles(const std::vector<const Cycle*>& cycles);
+    /// \brief Build a DCEL from boundary rings.
+    /// \param rings The boundary rings to populate the DCEL.
+    /// \returns A DCEL containing vertices, half-edges, and faces for the rings.
+    static DCEL fromRings(const std::vector<const Ring*>& rings);
 
-    /// \brief Build a DCEL from boundary cycles.
-    /// \param cycles The boundary cycles to populate the DCEL.
-    /// \returns A DCEL containing vertices, half-edges, and faces for the cycles.
-    static DCEL fromCycles(const std::vector<Cycle>& cycles);
+    /// \brief Build a DCEL from boundary rings.
+    /// \param rings The boundary rings to populate the DCEL.
+    /// \returns A DCEL containing vertices, half-edges, and faces for the rings.
+    static DCEL fromRings(const std::vector<Ring>& rings);
 
-    /// \brief Build a DCEL from segments by assembling them into cycles.
+    /// \brief Build a DCEL from segments by assembling them into rings.
     /// \param segments The segments to populate the DCEL.
     /// \returns A DCEL containing vertices, half-edges, and faces for the segments.
     static DCEL fromSegments(const std::vector<Segment>& segments);

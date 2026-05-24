@@ -1,9 +1,6 @@
-#include "python/bindings.hpp"
-
 #include "geometry/polygon.hpp"
-
+#include "python/bindings.hpp"
 #include <pybind11/stl.h>
-
 #include <vector>
 
 namespace py = pybind11;
@@ -70,27 +67,26 @@ void bindGeometry(py::module_& module) {
         .def("__lt__", &Segment::operator<);
     total_ordering(module.attr("Segment"));
 
-    py::class_<Cycle>(module, "Cycle")
+    py::class_<Ring>(module, "Ring")
         .def(py::init<std::vector<Point>>(), py::arg("points"))
-        .def_readwrite("points", &Cycle::points)
-        .def("signed_area", &Cycle::signedArea)
-        .def("area", &Cycle::area)
-        .def("is_outer", &Cycle::isOuter)
-        .def("segments", &Cycle::segments)
-        .def("__eq__", &Cycle::operator==);
+        .def_readwrite("points", &Ring::points)
+        .def("signed_area", &Ring::signedArea)
+        .def("area", &Ring::area)
+        .def("is_outer", &Ring::isOuter)
+        .def("segments", &Ring::segments)
+        .def("__eq__", &Ring::operator==);
 
     py::class_<Polygon>(module, "Polygon")
-        .def(py::init<Cycle, std::vector<Cycle>>(), py::arg("outer_cycle"),
-             py::arg("inner_cycles") = std::vector<Cycle>{})
-        .def_readwrite("outer_cycle", &Polygon::outer_cycle)
-        .def_readwrite("inner_cycles", &Polygon::inner_cycles)
-        .def("cycles",
+        .def(py::init<Ring, std::vector<Ring>>(), py::arg("outer_ring"),
+             py::arg("inner_rings") = std::vector<Ring>{})
+        .def_readwrite("outer_ring", &Polygon::outer_ring)
+        .def_readwrite("inner_rings", &Polygon::inner_rings)
+        .def("rings",
              [](const Polygon& polygon) {
-                 std::vector<Cycle> cycles;
-                 cycles.push_back(polygon.outer_cycle);
-                 cycles.insert(cycles.end(), polygon.inner_cycles.begin(),
-                               polygon.inner_cycles.end());
-                 return cycles;
+                 std::vector<Ring> rings;
+                 rings.push_back(polygon.outer_ring);
+                 rings.insert(rings.end(), polygon.inner_rings.begin(), polygon.inner_rings.end());
+                 return rings;
              })
         .def("area", &Polygon::area)
         .def("__eq__", &Polygon::operator==);
@@ -99,7 +95,7 @@ void bindGeometry(py::module_& module) {
         .def(py::init<Point, Point>(), py::arg("lower_left"), py::arg("upper_right"))
         .def_readwrite("lower_left", &Rectangle::lower_left)
         .def_readwrite("upper_right", &Rectangle::upper_right)
-        .def("cycle", &Rectangle::cycle)
+        .def("ring", &Rectangle::ring)
         .def("polygon", &Rectangle::polygon)
         .def("contains", py::overload_cast<const Point&>(&Rectangle::contains, py::const_))
         .def("contains", py::overload_cast<const Segment&>(&Rectangle::contains, py::const_))

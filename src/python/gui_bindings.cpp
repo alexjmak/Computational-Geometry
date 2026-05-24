@@ -57,7 +57,7 @@ void bindGui(py::module_& module) {
              py::arg("s") = 5)
         .def("add_segments", &Plot::addSegments, py::arg("segments"), py::arg("color") = "blue",
              py::arg("line_width") = 1, py::arg("show_arrows") = true)
-        .def("add_cycle", &Plot::addCycle, py::arg("cycle"), py::arg("face_color") = "lightblue",
+        .def("add_ring", &Plot::addRing, py::arg("ring"), py::arg("face_color") = "lightblue",
              py::arg("edge_color") = "blue", py::arg("alpha") = 0.35)
         .def("add_polygon", &Plot::addPolygon, py::arg("polygon"),
              py::arg("face_color") = "lightblue", py::arg("edge_color") = "blue",

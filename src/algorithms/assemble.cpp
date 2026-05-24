@@ -10,7 +10,7 @@
 #include <utility>
 #include <vector>
 
-std::vector<Cycle> assembleCycles(const std::vector<Segment>& segments) {
+std::vector<Ring> assembleRings(const std::vector<Segment>& segments) {
     std::unordered_map<Point, std::vector<Point>> adjacency_list;
     std::unordered_set<Segment> seen;
 
@@ -39,26 +39,26 @@ std::vector<Cycle> assembleCycles(const std::vector<Segment>& segments) {
         }
     }
 
-    // Build cycles by walking the adjacency list
-    std::vector<Cycle> cycles;
+    // Build rings by walking the adjacency list
+    std::vector<Ring> rings;
     std::unordered_set<Point> visited;
     for (const auto& [point, neighbors] : adjacency_list) {
         if (visited.contains(point)) {
             continue;
         }
 
-        std::vector<Point> cycle_points;
+        std::vector<Point> ring_points;
         const Point start = point;
         Point prev = start;
         Point curr = start;
         do {
             if (visited.contains(curr)) {
-                throw std::invalid_argument("Cycle walk reached an already visited point: " +
+                throw std::invalid_argument("Ring walk reached an already visited point: " +
                                             curr.toString());
             }
 
             visited.insert(curr);
-            cycle_points.push_back(curr);
+            ring_points.push_back(curr);
 
             const std::vector<Point>& neighbors = adjacency_list[curr];
             const Point& next = neighbors[0] == prev ? neighbors[1] : neighbors[0];
@@ -66,14 +66,14 @@ std::vector<Cycle> assembleCycles(const std::vector<Segment>& segments) {
             curr = next;
         } while (curr != start);
 
-        Cycle cycle(std::move(cycle_points));
-        if (!cycle.isOuter()) {
-            cycle.reverse();
+        Ring ring(std::move(ring_points));
+        if (!ring.isOuter()) {
+            ring.reverse();
         }
-        cycles.emplace_back(std::move(cycle));
+        rings.emplace_back(std::move(ring));
     }
 
-    return cycles;
+    return rings;
 }
 
 std::vector<Polygon> assemblePolygons(const std::vector<Segment>& segments) {
@@ -81,7 +81,7 @@ std::vector<Polygon> assemblePolygons(const std::vector<Segment>& segments) {
     const std::vector<std::size_t> face_depths = dcel.faceDepths();
     std::vector<Polygon> polygons;
 
-    // Face depth counts how many boundary cycles separate a face from the unbounded face.
+    // Face depth counts how many boundary rings separate a face from the unbounded face.
     // By the odd-even fill rule, odd-depth faces are filled polygon interiors, while
     // even-depth faces are exterior/hole regions.
     for (std::size_t i = 0; i < dcel.faces.size(); ++i) {

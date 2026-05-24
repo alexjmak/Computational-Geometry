@@ -94,9 +94,9 @@ TEST(IntersectionTest, IntersectsSegmentAtY) {
     EXPECT_EQ(intersectAtY(Segment(Point(0, 0), Point(4, 4)), Point(0, 5)), std::nullopt);
 }
 
-TEST(CycleTest, ComputesSignedAreaOrientationAndSegments) {
-    const Cycle outer({Point(0, 0), Point(2, 0), Point(2, 2), Point(0, 2)});
-    const Cycle inner({Point(0, 0), Point(0, 2), Point(2, 2), Point(2, 0)});
+TEST(RingTest, ComputesSignedAreaOrientationAndSegments) {
+    const Ring outer({Point(0, 0), Point(2, 0), Point(2, 2), Point(0, 2)});
+    const Ring inner({Point(0, 0), Point(0, 2), Point(2, 2), Point(2, 0)});
 
     EXPECT_DOUBLE_EQ(outer.signedArea(), 4.0);
     EXPECT_DOUBLE_EQ(inner.signedArea(), -4.0);
@@ -108,27 +108,27 @@ TEST(CycleTest, ComputesSignedAreaOrientationAndSegments) {
                    Segment(Point(2, 0), Point(2, 2)), Segment(Point(2, 2), Point(0, 2))}));
 }
 
-TEST(PolygonTest, ValidatesCycleOrientations) {
-    const Cycle outer({Point(0, 0), Point(4, 0), Point(4, 4), Point(0, 4)});
-    const Cycle hole({Point(1, 1), Point(1, 2), Point(2, 2), Point(2, 1)});
+TEST(PolygonTest, ValidatesRingOrientations) {
+    const Ring outer({Point(0, 0), Point(4, 0), Point(4, 4), Point(0, 4)});
+    const Ring hole({Point(1, 1), Point(1, 2), Point(2, 2), Point(2, 1)});
 
     EXPECT_NO_THROW(Polygon(outer, {hole}));
     EXPECT_THROW(
-        [] { Polygon polygon(Cycle({Point(1, 1), Point(1, 2), Point(2, 2), Point(2, 1)})); }(),
+        [] { Polygon polygon(Ring({Point(1, 1), Point(1, 2), Point(2, 2), Point(2, 1)})); }(),
         std::invalid_argument);
     EXPECT_THROW([&] { Polygon polygon(outer, {outer}); }(), std::invalid_argument);
 }
 
-TEST(PolygonTest, ReturnsOuterThenInnerCycles) {
-    const Cycle outer({Point(0, 0), Point(4, 0), Point(4, 4), Point(0, 4)});
-    const Cycle hole({Point(1, 1), Point(1, 2), Point(2, 2), Point(2, 1)});
+TEST(PolygonTest, ReturnsOuterThenInnerRings) {
+    const Ring outer({Point(0, 0), Point(4, 0), Point(4, 4), Point(0, 4)});
+    const Ring hole({Point(1, 1), Point(1, 2), Point(2, 2), Point(2, 1)});
     Polygon polygon(outer, {hole});
 
-    const std::vector<const Cycle*> cycles = static_cast<const Polygon&>(polygon).cycles();
+    const std::vector<const Ring*> rings = static_cast<const Polygon&>(polygon).rings();
 
-    ASSERT_EQ(cycles.size(), 2);
-    EXPECT_EQ(*cycles[0], outer);
-    EXPECT_EQ(*cycles[1], hole);
+    ASSERT_EQ(rings.size(), 2);
+    EXPECT_EQ(*rings[0], outer);
+    EXPECT_EQ(*rings[1], hole);
 }
 
 TEST(RandomTest, SeededGenerationIsDeterministic) {
@@ -140,15 +140,15 @@ TEST(RandomTest, SeededGenerationIsDeterministic) {
 
 TEST(RandomTest, RandomConvexPolygonHasPositiveArea) {
     std::mt19937 rng(3);
-    const Cycle polygon = randomConvexPolygon(8, -20, 20, &rng);
+    const Ring polygon = randomConvexPolygon(8, -20, 20, &rng);
 
     EXPECT_GE(polygon.points.size(), 3);
     EXPECT_TRUE(polygon.isOuter());
 }
 
 TEST(DCELTest, CreatesDCELFromPolygons) {
-    const Cycle outer({Point(0, 0), Point(4, 0), Point(4, 4), Point(0, 4)});
-    const Cycle hole({Point(1, 1), Point(1, 2), Point(2, 2), Point(2, 1)});
+    const Ring outer({Point(0, 0), Point(4, 0), Point(4, 4), Point(0, 4)});
+    const Ring hole({Point(1, 1), Point(1, 2), Point(2, 2), Point(2, 1)});
     const Polygon polygon(outer, {hole});
 
     const DCEL dcel = DCEL::fromPolygons({polygon});
@@ -186,11 +186,11 @@ TEST(DCELTest, CreatesDCELFromPolygons) {
 }
 
 TEST(DCELTest, CreatesFacesForDonutWithIsland) {
-    const Cycle donut_outer({Point(0, 0), Point(10, 0), Point(10, 10), Point(0, 10)});
-    const Cycle donut_hole({Point(3, 3), Point(3, 7), Point(7, 7), Point(7, 3)});
+    const Ring donut_outer({Point(0, 0), Point(10, 0), Point(10, 10), Point(0, 10)});
+    const Ring donut_hole({Point(3, 3), Point(3, 7), Point(7, 7), Point(7, 3)});
     const Polygon donut(donut_outer, {donut_hole});
 
-    const Cycle island_outer({Point(4, 4), Point(6, 4), Point(6, 6), Point(4, 6)});
+    const Ring island_outer({Point(4, 4), Point(6, 4), Point(6, 6), Point(4, 6)});
     const Polygon island(island_outer);
 
     const DCEL dcel = DCEL::fromPolygons({donut, island});
@@ -224,8 +224,8 @@ TEST(DCELTest, CreatesFacesForDonutWithIsland) {
 }
 
 TEST(DCELTest, ReusesHalfEdgesForPolygonsSharingEdge) {
-    const Polygon left(Rectangle(Point(0, 0), Point(1, 1)).cycle());
-    const Polygon right(Rectangle(Point(1, 0), Point(2, 1)).cycle());
+    const Polygon left(Rectangle(Point(0, 0), Point(1, 1)).ring());
+    const Polygon right(Rectangle(Point(1, 0), Point(2, 1)).ring());
 
     const DCEL dcel = DCEL::fromPolygons({left, right});
 
@@ -247,9 +247,9 @@ TEST(DCELTest, ReusesHalfEdgesForPolygonsSharingEdge) {
 }
 
 TEST(DCELTest, HandlesThreeRectanglesTouchingAtPoints) {
-    const Polygon lower_left(Rectangle(Point(0, 0), Point(1, 1)).cycle());
-    const Polygon middle(Rectangle(Point(1, 1), Point(2, 2)).cycle());
-    const Polygon upper_right(Rectangle(Point(2, 2), Point(3, 3)).cycle());
+    const Polygon lower_left(Rectangle(Point(0, 0), Point(1, 1)).ring());
+    const Polygon middle(Rectangle(Point(1, 1), Point(2, 2)).ring());
+    const Polygon upper_right(Rectangle(Point(2, 2), Point(3, 3)).ring());
 
     const DCEL dcel = DCEL::fromPolygons({lower_left, middle, upper_right});
 

@@ -42,15 +42,15 @@ class Plot : public QWidget {
     void addSegments(const std::vector<Segment>& segments, const std::string& color = "blue",
                      int line_width = 1, bool show_arrows = true);
 
-    /// \brief Draw a single closed cycle as a polygonal region.
-    /// \param cycle The cycle to draw.
+    /// \brief Draw a single closed ring as a polygonal region.
+    /// \param ring The ring to draw.
     /// \param face_color The fill color.
     /// \param edge_color The boundary color.
     /// \param alpha The fill opacity.
-    void addCycle(const Cycle& cycle, const std::string& face_color = "lightblue",
-                  const std::string& edge_color = "blue", double alpha = 0.35);
+    void addRing(const Ring& ring, const std::string& face_color = "lightblue",
+                 const std::string& edge_color = "blue", double alpha = 0.35);
 
-    /// \brief Draw a polygon with its outer cycle and any inner holes.
+    /// \brief Draw a polygon with its outer ring and any inner holes.
     /// \param polygon The polygon to draw.
     /// \param face_color The fill color.
     /// \param edge_color The boundary color.
@@ -69,21 +69,21 @@ class Plot : public QWidget {
     void show();
 
   protected:
-    /// \brief Reposition filled cycle overlays after the plot is resized.
+    /// \brief Reposition filled ring overlays after the plot is resized.
     /// \param event The Qt resize event.
     void resizeEvent(QResizeEvent* event) override;
 
   private:
     /// \brief Filled polygon overlay tracked in data coordinates.
-    struct CycleFill {
-        std::vector<std::vector<Point>> cycles; ///< The cycle vertices in data coordinates.
-        QGraphicsPathItem* item;                ///< The scene item used to render the fill.
+    struct RingFill {
+        std::vector<std::vector<Point>> rings; ///< The ring vertices in data coordinates.
+        QGraphicsPathItem* item;               ///< The scene item used to render the fill.
     };
 
     /// \brief Segment arrowhead overlay tracked in data coordinates.
     struct SegmentArrow {
-        Segment segment;             ///< The directed segment in data coordinates.
-        QGraphicsPolygonItem* item;  ///< The scene item used to render the arrowhead.
+        Segment segment;            ///< The directed segment in data coordinates.
+        QGraphicsPolygonItem* item; ///< The scene item used to render the arrowhead.
     };
 
     /// \brief Add an arrowhead overlay at the end of a directed segment.
@@ -92,17 +92,17 @@ class Plot : public QWidget {
     /// \param line_width The segment line width.
     void addSegmentArrow(const Segment& segment, const std::string& color, int line_width);
 
-    /// \brief Draw only the boundary of a closed cycle.
-    /// \param cycle The cycle to draw.
+    /// \brief Draw only the boundary of a closed ring.
+    /// \param ring The ring to draw.
     /// \param edge_color The boundary color.
-    void addCycleBoundary(const Cycle& cycle, const std::string& edge_color);
+    void addRingBoundary(const Ring& ring, const std::string& edge_color);
 
-    /// \brief Add a filled overlay for a set of cycles using odd-even filling.
-    /// \param cycles The cycles that define the filled region.
+    /// \brief Add a filled overlay for a set of rings using odd-even filling.
+    /// \param rings The rings that define the filled region.
     /// \param face_color The fill color.
     /// \param alpha The fill opacity.
-    void addCycleFill(const std::vector<std::vector<Point>>& cycles, const std::string& face_color,
-                      double alpha);
+    void addRingFill(const std::vector<std::vector<Point>>& rings, const std::string& face_color,
+                     double alpha);
 
     /// \brief Expand the tracked plot bounds to include a point.
     /// \param point The point to include.
@@ -111,16 +111,16 @@ class Plot : public QWidget {
     /// \brief Recompute chart axes using the tracked bounds and 10 percent padding.
     void updateAxes();
 
-    /// \brief Reposition all cycle fill scene items after axes or geometry changes.
+    /// \brief Reposition all ring fill scene items after axes or geometry changes.
     void updateOverlays();
 
-    QChart* chart;                      ///< The Qt chart storing plotted series.
-    QChartView* chartView;              ///< The Qt widget used to display the chart.
-    std::optional<double> min_x;        ///< The minimum plotted x coordinate.
-    std::optional<double> max_x;        ///< The maximum plotted x coordinate.
-    std::optional<double> min_y;        ///< The minimum plotted y coordinate.
-    std::optional<double> max_y;        ///< The maximum plotted y coordinate.
-    std::vector<CycleFill> cycle_fills; ///< Filled cycle overlays in data coordinates.
+    QChart* chart;                            ///< The Qt chart storing plotted series.
+    QChartView* chartView;                    ///< The Qt widget used to display the chart.
+    std::optional<double> min_x;              ///< The minimum plotted x coordinate.
+    std::optional<double> max_x;              ///< The maximum plotted x coordinate.
+    std::optional<double> min_y;              ///< The minimum plotted y coordinate.
+    std::optional<double> max_y;              ///< The maximum plotted y coordinate.
+    std::vector<RingFill> ring_fills;         ///< Filled ring overlays in data coordinates.
     std::vector<SegmentArrow> segment_arrows; ///< Segment arrowhead overlays in data coordinates.
 };
 
