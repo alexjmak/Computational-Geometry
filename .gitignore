@@ -3,3 +3,4 @@ build*
 docs
 *.yaml
 __pycache__
+scripts/*.so
