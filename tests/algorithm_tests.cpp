@@ -217,3 +217,21 @@ TEST(LineSegmentIntersectionTest, ReportsOverlapEndpoints) {
 
     expectIntersections(segments, {Point(2, 0), Point(4, 0)});
 }
+
+TEST(LineSegmentIntersectionTest, KeepsDuplicateSegmentsDistinctInternally) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(4, 0)),
+        Segment(Point(0, 0), Point(4, 0)),
+    };
+
+    expectIntersections(segments, {Point(0, 0), Point(4, 0)});
+}
+
+TEST(LineSegmentIntersectionTest, KeepsReversedDuplicateSegmentsDistinctInternally) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(4, 0)),
+        Segment(Point(4, 0), Point(0, 0)),
+    };
+
+    expectIntersections(segments, {Point(0, 0), Point(4, 0)});
+}

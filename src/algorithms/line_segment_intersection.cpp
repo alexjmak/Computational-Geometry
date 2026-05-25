@@ -1,6 +1,7 @@
 #include "algorithms/line_segment_intersection.hpp"
 #include "geometry/predicates.hpp"
 #include <climits>
+#include <cstddef>
 #include <iostream>
 #include <iterator>
 #include <map>
@@ -42,6 +43,7 @@ class State;
 /// \brief Segment wrapper with sweep-state-dependent cached ordering data.
 class ActiveSegment {
   public:
+    std::size_t id;             ///< The original input segment index.
     Segment segment;            ///< The canonicalized segment represented in the active set.
     State* line_sweep;          ///< The owning sweep-line state.
     Rational slope_inverse;     ///< The finite inverse slope used for tie-breaking.
@@ -50,9 +52,10 @@ class ActiveSegment {
     mutable std::optional<Point> cached_point_at_event; ///< Cached intersection at curr_event.
 
     /// \brief Wrap a segment with sweep-specific cached data.
+    /// \param id The original input segment index.
     /// \param segment The segment represented in the active set.
     /// \param line_sweep The owning sweep-line state.
-    ActiveSegment(const Segment& segment, State* line_sweep);
+    ActiveSegment(std::size_t id, const Segment& segment, State* line_sweep);
 
     /// \brief Return this segment's intersection with the current sweep line.
     /// \returns The point where the segment meets the current event's horizontal line.
@@ -64,13 +67,13 @@ class ActiveSegment {
     bool operator==(const ActiveSegment& other) const;
 };
 
-/// \brief Hash active segments by their wrapped directed geometry.
+/// \brief Hash active segments by their original input identity.
 struct ActiveSegmentHash {
-    /// \brief Hash an active segment by its underlying geometry.
+    /// \brief Hash an active segment by its original input identity.
     /// \param s The active segment to hash.
-    /// \returns A hash derived from the wrapped segment.
+    /// \returns A hash derived from the original input segment index.
     size_t operator()(const ActiveSegment& s) const {
-        return std::hash<Segment>{}(s.segment);
+        return std::hash<std::size_t>{}(s.id);
     }
 };
 
@@ -142,8 +145,8 @@ State::State() : curr_event(EventPoint(Point(INT_MAX, INT_MAX))) {}
 void State::populateEventQueue(const std::vector<Segment>& segments) {
     // Insert segment's upper endpoints into the event queue, and keep track of which
     // segments they belong to.
-    for (const Segment& s : segments) {
-        ActiveSegment lss(s.canonicalizedY(), this);
+    for (std::size_t id = 0; id < segments.size(); ++id) {
+        ActiveSegment lss(id, segments[id].canonicalizedY(), this);
         EventPoint upper_endpoint(lss.segment.end);
         EventPoint lower_endpoint(lss.segment.start);
         auto& upper_event = event_queue.try_emplace(upper_endpoint).first->second;
@@ -159,12 +162,13 @@ void State::populateEventQueue(const std::vector<Segment>& segments) {
 void State::printElement(const ActiveSegment& key) {
     auto point = key.pointAtCurrEvent();
     if (point) {
-        std::cout << key.segment.toString() << ": " << point->toString() << std::endl;
+        std::cout << "#" << key.id << " " << key.segment.toString() << ": " << point->toString()
+                  << std::endl;
     }
 }
 
-ActiveSegment::ActiveSegment(const Segment& segment, State* line_sweep)
-    : segment(segment), line_sweep(line_sweep), slope_inverse(0), slope_inverse_infinity(0),
+ActiveSegment::ActiveSegment(std::size_t id, const Segment& segment, State* line_sweep)
+    : id(id), segment(segment), line_sweep(line_sweep), slope_inverse(0), slope_inverse_infinity(0),
       cached_event(), cached_point_at_event() {
     Rational dx = segment.start.x - segment.end.x;
     Rational dy = segment.start.y - segment.end.y;
@@ -188,7 +192,7 @@ std::optional<Point> ActiveSegment::pointAtCurrEvent() const {
 }
 
 bool ActiveSegment::operator==(const ActiveSegment& other) const {
-    return segment == other.segment && line_sweep == other.line_sweep;
+    return id == other.id && line_sweep == other.line_sweep;
 }
 
 bool ActiveSegmentCompare::operator()(const ActiveSegment& a, const ActiveSegment& b) const {
@@ -205,6 +209,9 @@ bool ActiveSegmentCompare::operator()(const ActiveSegment& a, const ActiveSegmen
         int slope_cmp = compareSlopeInverse(a, b);
 
         if (slope_cmp == 0) {
+            if (a.segment == b.segment) {
+                return a.id < b.id;
+            }
             return a.segment < b.segment;
         }
 
@@ -346,7 +353,8 @@ bool handleEventPoint(EventPoint& ls_point, Event& event, State& line_sweep) {
     if (!event.witnesses.empty()) {
         probe_segment = *event.witnesses.begin();
     } else {
-        ActiveSegment dummy_segment(Segment(ls_point.point, ls_point.point), &line_sweep);
+        ActiveSegment dummy_segment(static_cast<std::size_t>(-1),
+                                    Segment(ls_point.point, ls_point.point), &line_sweep);
         EventPoint prev_event = line_sweep.curr_event;
         line_sweep.curr_event = ls_point;
 
