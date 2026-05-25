@@ -14,6 +14,6 @@ std::vector<Segment> slowConvexHull(const std::vector<Point>& points);
 /// \brief Compute the convex hull of a point set using a monotone-chain algorithm.
 /// \param points The input points.
 /// \returns A ring containing the convex hull vertices in boundary order.
-Ring convexHull(const std::vector<Point>& points);
+LinearRing convexHull(const std::vector<Point>& points);
 
 #endif // CONVEX_HULL_HPP

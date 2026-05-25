@@ -89,7 +89,7 @@ TEST(PlotTest, SetDocumentRendersAllLayerGeometry) {
     Layer layer;
     layer.points = {Point(0, 0)};
     layer.segments = {Segment(Point(0, 0), Point(1, 1))};
-    layer.polygons = {Polygon(Ring({Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1)}))};
+    layer.polygons = {Polygon(LinearRing({Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1)}))};
     document.layers.push_back(layer);
 
     Plot plot;
@@ -101,8 +101,8 @@ TEST(PlotTest, SetDocumentRendersAllLayerGeometry) {
 }
 
 TEST(PlotTest, AddPolygonUsesCompoundFillForHoles) {
-    const Ring outer({Point(0, 0), Point(4, 0), Point(4, 4), Point(0, 4)});
-    const Ring hole({Point(1, 1), Point(1, 3), Point(3, 3), Point(3, 1)});
+    const LinearRing outer({Point(0, 0), Point(4, 0), Point(4, 4), Point(0, 4)});
+    const LinearRing hole({Point(1, 1), Point(1, 3), Point(3, 3), Point(3, 1)});
     const Polygon polygon(outer, {hole});
 
     Plot plot;

@@ -102,7 +102,7 @@ void Plot::addSegmentArrow(const Segment& segment, const std::string& color, int
     segment_arrows.push_back({segment, arrow_item});
 }
 
-void Plot::addRing(const Ring& ring, const std::string& face_color, const std::string& edge_color,
+void Plot::addRing(const LinearRing& ring, const std::string& face_color, const std::string& edge_color,
                    double alpha) {
     if (ring.points.empty())
         return;
@@ -117,7 +117,7 @@ void Plot::addPolygon(const Polygon& polygon, const std::string& face_color,
     fill_rings.push_back(polygon.outer_ring.points);
     addRingBoundary(polygon.outer_ring, edge_color);
 
-    for (const Ring& inner_ring : polygon.inner_rings) {
+    for (const LinearRing& inner_ring : polygon.inner_rings) {
         fill_rings.push_back(inner_ring.points);
         addRingBoundary(inner_ring, edge_color);
     }
@@ -126,7 +126,7 @@ void Plot::addPolygon(const Polygon& polygon, const std::string& face_color,
     updateAxes();
 }
 
-void Plot::addRingBoundary(const Ring& ring, const std::string& edge_color) {
+void Plot::addRingBoundary(const LinearRing& ring, const std::string& edge_color) {
     if (ring.points.empty())
         return;
     QLineSeries* series = new QLineSeries();

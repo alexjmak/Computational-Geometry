@@ -67,23 +67,23 @@ void bindGeometry(py::module_& module) {
         .def("__lt__", &Segment::operator<);
     total_ordering(module.attr("Segment"));
 
-    py::class_<Ring>(module, "Ring")
+    py::class_<LinearRing>(module, "LinearRing")
         .def(py::init<std::vector<Point>>(), py::arg("points"))
-        .def_readwrite("points", &Ring::points)
-        .def("signed_area", &Ring::signedArea)
-        .def("area", &Ring::area)
-        .def("is_outer", &Ring::isOuter)
-        .def("segments", &Ring::segments)
-        .def("__eq__", &Ring::operator==);
+        .def_readwrite("points", &LinearRing::points)
+        .def("signed_area", &LinearRing::signedArea)
+        .def("area", &LinearRing::area)
+        .def("is_outer", &LinearRing::isOuter)
+        .def("segments", &LinearRing::segments)
+        .def("__eq__", &LinearRing::operator==);
 
     py::class_<Polygon>(module, "Polygon")
-        .def(py::init<Ring, std::vector<Ring>>(), py::arg("outer_ring"),
-             py::arg("inner_rings") = std::vector<Ring>{})
+        .def(py::init<LinearRing, std::vector<LinearRing>>(), py::arg("outer_ring"),
+             py::arg("inner_rings") = std::vector<LinearRing>{})
         .def_readwrite("outer_ring", &Polygon::outer_ring)
         .def_readwrite("inner_rings", &Polygon::inner_rings)
         .def("rings",
              [](const Polygon& polygon) {
-                 std::vector<Ring> rings;
+                 std::vector<LinearRing> rings;
                  rings.push_back(polygon.outer_ring);
                  rings.insert(rings.end(), polygon.inner_rings.begin(), polygon.inner_rings.end());
                  return rings;

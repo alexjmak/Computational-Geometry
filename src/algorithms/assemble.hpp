@@ -7,7 +7,7 @@
 /// Segment orientation is ignored during assembly.
 /// \param segments Segments forming one or more closed rings.
 /// \returns Assembled rings oriented with positive signed area.
-std::vector<Ring> assembleRings(const std::vector<Segment>& segments);
+std::vector<LinearRing> assembleRings(const std::vector<Segment>& segments);
 
 /// \brief Assembles polygons from unordered segments forming one or more closed boundaries.
 /// Segment orientation is ignored during assembly. Polygons are classified using the odd-even

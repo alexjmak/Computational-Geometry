@@ -61,7 +61,7 @@ TEST(ConvexHullTest, BuildsSquareAroundInteriorPoint) {
         Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1), Point(Rational(1, 2), Rational(1, 2)),
     };
 
-    const Ring hull = convexHull(points);
+    const LinearRing hull = convexHull(points);
 
     EXPECT_EQ(hull.points,
               std::vector<Point>({Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1)}));
@@ -71,7 +71,7 @@ TEST(ConvexHullTest, BuildsSquareAroundInteriorPoint) {
 TEST(ConvexHullTest, KeepsOnlyEndpointsForCollinearPoints) {
     const std::vector<Point> points = {Point(0, 0), Point(1, 0), Point(2, 0), Point(3, 0)};
 
-    const Ring hull = convexHull(points);
+    const LinearRing hull = convexHull(points);
 
     EXPECT_EQ(hull.points, std::vector<Point>({Point(0, 0), Point(3, 0)}));
 }
@@ -80,7 +80,7 @@ TEST(ConvexHullTest, SlowAndFastHullUseSameBoundaryPoints) {
     const std::vector<Point> points = {Point(0, 0), Point(2, 0), Point(2, 2),
                                        Point(0, 2), Point(1, 1), Point(1, 0)};
 
-    const Ring hull = convexHull(points);
+    const LinearRing hull = convexHull(points);
     const std::vector<Segment> slow_hull = slowConvexHull(points);
 
     std::vector<Point> slow_points;
@@ -99,7 +99,7 @@ TEST(AssembleRingsTest, BuildsOuterRingFromUnorderedSegments) {
         Segment(Point(0, 0), Point(1, 0)),
     };
 
-    const std::vector<Ring> rings = assembleRings(segments);
+    const std::vector<LinearRing> rings = assembleRings(segments);
 
     ASSERT_EQ(rings.size(), 1);
     EXPECT_TRUE(rings[0].isOuter());
@@ -116,7 +116,7 @@ TEST(AssembleRingsTest, BuildsMultipleDisjointOuterRings) {
         Segment(Point(5, 2), Point(3, 2)), Segment(Point(3, 2), Point(3, 0)),
     };
 
-    const std::vector<Ring> rings = assembleRings(segments);
+    const std::vector<LinearRing> rings = assembleRings(segments);
 
     ASSERT_EQ(rings.size(), 2);
     EXPECT_TRUE(rings[0].isOuter());

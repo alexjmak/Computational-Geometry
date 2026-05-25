@@ -124,7 +124,7 @@ class DCEL {
     /// \brief Convert a half-edge ring into a geometric ring.
     /// \param half_edge The half-edge whose ring should be converted.
     /// \returns A ring containing the vertices of the half-edge ring.
-    Ring ringOf(const HalfEdge& half_edge) const;
+    LinearRing ringOf(const HalfEdge& half_edge) const;
 
     /// \brief Convert a face into a polygon by converting its outer and inner rings.
     /// \param face The face to convert.
@@ -148,12 +148,12 @@ class DCEL {
     /// \brief Build a DCEL from boundary rings.
     /// \param rings The boundary rings to populate the DCEL.
     /// \returns A DCEL containing vertices, half-edges, and faces for the rings.
-    static DCEL fromRings(const std::vector<const Ring*>& rings);
+    static DCEL fromRings(const std::vector<const LinearRing*>& rings);
 
     /// \brief Build a DCEL from boundary rings.
     /// \param rings The boundary rings to populate the DCEL.
     /// \returns A DCEL containing vertices, half-edges, and faces for the rings.
-    static DCEL fromRings(const std::vector<Ring>& rings);
+    static DCEL fromRings(const std::vector<LinearRing>& rings);
 
     /// \brief Build a DCEL from segments by assembling them into rings.
     /// \param segments The segments to populate the DCEL.

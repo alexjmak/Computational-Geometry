@@ -46,9 +46,9 @@ YAML::Node emitPoint(const Point& p) {
     return node;
 }
 
-Ring parseRing(const YAML::Node& node) {
+LinearRing parseRing(const YAML::Node& node) {
     if (!node.IsSequence()) {
-        throw std::runtime_error("Ring must be a list of points");
+        throw std::runtime_error("LinearRing must be a list of points");
     }
 
     std::vector<Point> points;
@@ -58,10 +58,10 @@ Ring parseRing(const YAML::Node& node) {
         points.push_back(parsePoint(pointNode));
     }
 
-    return Ring(std::move(points));
+    return LinearRing(std::move(points));
 }
 
-YAML::Node emitRing(const Ring& ring) {
+YAML::Node emitRing(const LinearRing& ring) {
     YAML::Node node;
 
     for (const Point& point : ring.points) {
@@ -92,8 +92,8 @@ Polygon parsePolygon(const YAML::Node& node) {
         throw std::runtime_error("Polygon is missing required 'outer' ring");
     }
 
-    Ring outer_ring = parseRing(node["outer"]);
-    std::vector<Ring> inner_rings;
+    LinearRing outer_ring = parseRing(node["outer"]);
+    std::vector<LinearRing> inner_rings;
 
     if (node["holes"]) {
         for (const auto& holeNode : node["holes"]) {
@@ -112,7 +112,7 @@ YAML::Node emitPolygon(const Polygon& polygon) {
     if (!polygon.inner_rings.empty()) {
         YAML::Node holes;
 
-        for (const Ring& inner_ring : polygon.inner_rings) {
+        for (const LinearRing& inner_ring : polygon.inner_rings) {
             holes.push_back(emitRing(inner_ring));
         }
 

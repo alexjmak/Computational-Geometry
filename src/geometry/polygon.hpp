@@ -4,23 +4,19 @@
 #include "geometry/segment.hpp"
 #include <vector>
 
-/// \brief Closed polygonal boundary ring.
+/// \brief Abstract closed boundary ring.
 class Ring {
   public:
-    std::vector<Point> points; ///< The ordered vertices of the closed ring.
-
-    /// \brief Initialize a polygonal ring from an ordered list of points.
-    /// \param points The points that define the closed ring boundary.
-    Ring(std::vector<Point> points);
+    virtual ~Ring() = default;
 
     /// \brief Reverse the point order of the ring. This changes the ring orientation and negates
     /// the signed area so outer rings become inner and vice versa.
-    void reverse();
+    virtual void reverse() = 0;
 
     /// \brief Compute the signed area of the ring.
     /// \returns The signed area. Positive values indicate counter-clockwise point order,
     /// and negative values indicate clockwise point order.
-    double signedArea() const;
+    virtual double signedArea() const = 0;
 
     /// \brief Compute the unsigned area of the ring.
     /// \returns The absolute area enclosed by the ring.
@@ -29,6 +25,25 @@ class Ring {
     /// \brief Check whether the ring is oriented counter-clockwise.
     /// \returns True if the ring has positive signed area, otherwise false.
     bool isOuter() const;
+};
+
+/// \brief Closed polygonal boundary ring made of straight line segments.
+class LinearRing final : public Ring {
+  public:
+    std::vector<Point> points; ///< The ordered vertices of the closed ring.
+
+    /// \brief Initialize a polygonal ring from an ordered list of points.
+    /// \param points The points that define the closed ring boundary.
+    LinearRing(std::vector<Point> points);
+
+    /// \brief Reverse the point order of the ring. This changes the ring orientation and negates
+    /// the signed area so outer rings become inner and vice versa.
+    void reverse() override;
+
+    /// \brief Compute the signed area of the ring.
+    /// \returns The signed area. Positive values indicate counter-clockwise point order,
+    /// and negative values indicate clockwise point order.
+    double signedArea() const override;
 
     /// \brief Convert the ring into its directed boundary segments.
     /// \returns A list of segments connecting consecutive points in the ring.
@@ -37,27 +52,27 @@ class Ring {
     /// \brief Check whether two rings contain the same ordered vertices.
     /// \param other The ring to compare against.
     /// \returns True when both rings have identical point order.
-    bool operator==(const Ring& other) const;
+    bool operator==(const LinearRing& other) const;
 };
 
 /// \brief Polygon represented by an outer boundary and optional inner hole rings.
 class Polygon {
   public:
-    Ring outer_ring;               ///< The outer boundary ring.
-    std::vector<Ring> inner_rings; ///< The inner hole boundary rings.
+    LinearRing outer_ring;               ///< The outer boundary ring.
+    std::vector<LinearRing> inner_rings; ///< The inner hole boundary rings.
 
     /// \brief Initialize a polygon from an outer ring and optional inner rings.
     /// \param outer_ring The outer boundary ring.
     /// \param inner_rings The inner hole boundary rings.
-    Polygon(Ring outer_ring, std::vector<Ring> inner_rings = {});
+    Polygon(LinearRing outer_ring, std::vector<LinearRing> inner_rings = {});
 
     /// \brief Get pointers to all boundary rings, with the outer ring first.
     /// \returns A vector containing the outer ring followed by all inner rings.
-    std::vector<Ring*> rings();
+    std::vector<LinearRing*> rings();
 
     /// \brief Get const pointers to all boundary rings, with the outer ring first.
     /// \returns A vector containing the outer ring followed by all inner rings.
-    std::vector<const Ring*> rings() const;
+    std::vector<const LinearRing*> rings() const;
 
     /// \brief Compute the signed area contributed by all polygon rings.
     /// \returns The sum of the signed areas of the polygon's rings.
@@ -82,7 +97,7 @@ class Rectangle {
 
     /// \brief Convert the rectangle boundary into a counter-clockwise ring.
     /// \returns A ring containing the four rectangle corners.
-    Ring ring() const;
+    LinearRing ring() const;
 
     /// \brief Convert the rectangle into the polygon representation.
     /// \returns A polygon with one outer rectangular ring.

@@ -10,7 +10,7 @@
 #include <utility>
 #include <vector>
 
-std::vector<Ring> assembleRings(const std::vector<Segment>& segments) {
+std::vector<LinearRing> assembleRings(const std::vector<Segment>& segments) {
     std::unordered_map<Point, std::vector<Point>> adjacency_list;
     std::unordered_set<Segment> seen;
 
@@ -40,7 +40,7 @@ std::vector<Ring> assembleRings(const std::vector<Segment>& segments) {
     }
 
     // Build rings by walking the adjacency list
-    std::vector<Ring> rings;
+    std::vector<LinearRing> rings;
     std::unordered_set<Point> visited;
     for (const auto& [point, neighbors] : adjacency_list) {
         if (visited.contains(point)) {
@@ -53,7 +53,7 @@ std::vector<Ring> assembleRings(const std::vector<Segment>& segments) {
         Point curr = start;
         do {
             if (visited.contains(curr)) {
-                throw std::invalid_argument("Ring walk reached an already visited point: " +
+                throw std::invalid_argument("LinearRing walk reached an already visited point: " +
                                             curr.toString());
             }
 
@@ -66,7 +66,7 @@ std::vector<Ring> assembleRings(const std::vector<Segment>& segments) {
             curr = next;
         } while (curr != start);
 
-        Ring ring(std::move(ring_points));
+        LinearRing ring(std::move(ring_points));
         if (!ring.isOuter()) {
             ring.reverse();
         }

@@ -42,7 +42,7 @@ std::vector<Segment> slowConvexHull(const std::vector<Point>& points) {
     return segments;
 }
 
-Ring convexHull(const std::vector<Point>& points) {
+LinearRing convexHull(const std::vector<Point>& points) {
     std::vector<Point> sorted_points = points;
     std::sort(sorted_points.begin(), sorted_points.end());
     std::vector<Point> lower_hull = buildHalfHull(sorted_points);
@@ -52,5 +52,5 @@ Ring convexHull(const std::vector<Point>& points) {
     hull.reserve(lower_hull.size() + upper_hull.size() - 2);
     hull.insert(hull.end(), lower_hull.begin(), lower_hull.end() - 1);
     hull.insert(hull.end(), upper_hull.begin(), upper_hull.end() - 1);
-    return Ring(hull);
+    return LinearRing(hull);
 }

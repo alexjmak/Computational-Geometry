@@ -36,7 +36,7 @@ std::vector<Point> Document::collectPoints() const {
             points.push_back(segment.end);
         }
         for (const Polygon& polygon : layer.polygons) {
-            for (const Ring* ring : polygon.rings()) {
+            for (const LinearRing* ring : polygon.rings()) {
                 points.insert(points.end(), ring->points.begin(), ring->points.end());
             }
         }
@@ -49,7 +49,7 @@ std::vector<Segment> Document::collectSegments() const {
     for (const Layer& layer : layers) {
         segments.insert(segments.end(), layer.segments.begin(), layer.segments.end());
         for (const Polygon& polygon : layer.polygons) {
-            for (const Ring* ring : polygon.rings()) {
+            for (const LinearRing* ring : polygon.rings()) {
                 std::vector<Segment> ring_segments = ring->segments();
                 segments.insert(segments.end(), ring_segments.begin(), ring_segments.end());
             }

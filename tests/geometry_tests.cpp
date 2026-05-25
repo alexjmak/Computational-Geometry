@@ -94,9 +94,9 @@ TEST(IntersectionTest, IntersectsSegmentAtY) {
     EXPECT_EQ(intersectAtY(Segment(Point(0, 0), Point(4, 4)), Point(0, 5)), std::nullopt);
 }
 
-TEST(RingTest, ComputesSignedAreaOrientationAndSegments) {
-    const Ring outer({Point(0, 0), Point(2, 0), Point(2, 2), Point(0, 2)});
-    const Ring inner({Point(0, 0), Point(0, 2), Point(2, 2), Point(2, 0)});
+TEST(LinearRingTest, ComputesSignedAreaOrientationAndSegments) {
+    const LinearRing outer({Point(0, 0), Point(2, 0), Point(2, 2), Point(0, 2)});
+    const LinearRing inner({Point(0, 0), Point(0, 2), Point(2, 2), Point(2, 0)});
 
     EXPECT_DOUBLE_EQ(outer.signedArea(), 4.0);
     EXPECT_DOUBLE_EQ(inner.signedArea(), -4.0);
@@ -109,22 +109,22 @@ TEST(RingTest, ComputesSignedAreaOrientationAndSegments) {
 }
 
 TEST(PolygonTest, ValidatesRingOrientations) {
-    const Ring outer({Point(0, 0), Point(4, 0), Point(4, 4), Point(0, 4)});
-    const Ring hole({Point(1, 1), Point(1, 2), Point(2, 2), Point(2, 1)});
+    const LinearRing outer({Point(0, 0), Point(4, 0), Point(4, 4), Point(0, 4)});
+    const LinearRing hole({Point(1, 1), Point(1, 2), Point(2, 2), Point(2, 1)});
 
     EXPECT_NO_THROW(Polygon(outer, {hole}));
     EXPECT_THROW(
-        [] { Polygon polygon(Ring({Point(1, 1), Point(1, 2), Point(2, 2), Point(2, 1)})); }(),
+        [] { Polygon polygon(LinearRing({Point(1, 1), Point(1, 2), Point(2, 2), Point(2, 1)})); }(),
         std::invalid_argument);
     EXPECT_THROW([&] { Polygon polygon(outer, {outer}); }(), std::invalid_argument);
 }
 
 TEST(PolygonTest, ReturnsOuterThenInnerRings) {
-    const Ring outer({Point(0, 0), Point(4, 0), Point(4, 4), Point(0, 4)});
-    const Ring hole({Point(1, 1), Point(1, 2), Point(2, 2), Point(2, 1)});
+    const LinearRing outer({Point(0, 0), Point(4, 0), Point(4, 4), Point(0, 4)});
+    const LinearRing hole({Point(1, 1), Point(1, 2), Point(2, 2), Point(2, 1)});
     Polygon polygon(outer, {hole});
 
-    const std::vector<const Ring*> rings = static_cast<const Polygon&>(polygon).rings();
+    const std::vector<const LinearRing*> rings = static_cast<const Polygon&>(polygon).rings();
 
     ASSERT_EQ(rings.size(), 2);
     EXPECT_EQ(*rings[0], outer);
@@ -140,15 +140,15 @@ TEST(RandomTest, SeededGenerationIsDeterministic) {
 
 TEST(RandomTest, RandomConvexPolygonHasPositiveArea) {
     std::mt19937 rng(3);
-    const Ring polygon = randomConvexPolygon(8, -20, 20, &rng);
+    const LinearRing polygon = randomConvexPolygon(8, -20, 20, &rng);
 
     EXPECT_GE(polygon.points.size(), 3);
     EXPECT_TRUE(polygon.isOuter());
 }
 
 TEST(DCELTest, CreatesDCELFromPolygons) {
-    const Ring outer({Point(0, 0), Point(4, 0), Point(4, 4), Point(0, 4)});
-    const Ring hole({Point(1, 1), Point(1, 2), Point(2, 2), Point(2, 1)});
+    const LinearRing outer({Point(0, 0), Point(4, 0), Point(4, 4), Point(0, 4)});
+    const LinearRing hole({Point(1, 1), Point(1, 2), Point(2, 2), Point(2, 1)});
     const Polygon polygon(outer, {hole});
 
     const DCEL dcel = DCEL::fromPolygons({polygon});
@@ -187,11 +187,11 @@ TEST(DCELTest, CreatesDCELFromPolygons) {
 }
 
 TEST(DCELTest, CreatesFacesForDonutWithIsland) {
-    const Ring donut_outer({Point(0, 0), Point(10, 0), Point(10, 10), Point(0, 10)});
-    const Ring donut_hole({Point(3, 3), Point(3, 7), Point(7, 7), Point(7, 3)});
+    const LinearRing donut_outer({Point(0, 0), Point(10, 0), Point(10, 10), Point(0, 10)});
+    const LinearRing donut_hole({Point(3, 3), Point(3, 7), Point(7, 7), Point(7, 3)});
     const Polygon donut(donut_outer, {donut_hole});
 
-    const Ring island_outer({Point(4, 4), Point(6, 4), Point(6, 6), Point(4, 6)});
+    const LinearRing island_outer({Point(4, 4), Point(6, 4), Point(6, 6), Point(4, 6)});
     const Polygon island(island_outer);
 
     const DCEL dcel = DCEL::fromPolygons({donut, island});

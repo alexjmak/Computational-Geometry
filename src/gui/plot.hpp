@@ -47,7 +47,7 @@ class Plot : public QWidget {
     /// \param face_color The fill color.
     /// \param edge_color The boundary color.
     /// \param alpha The fill opacity.
-    void addRing(const Ring& ring, const std::string& face_color = "lightblue",
+    void addRing(const LinearRing& ring, const std::string& face_color = "lightblue",
                  const std::string& edge_color = "blue", double alpha = 0.35);
 
     /// \brief Draw a polygon with its outer ring and any inner holes.
@@ -95,7 +95,7 @@ class Plot : public QWidget {
     /// \brief Draw only the boundary of a closed ring.
     /// \param ring The ring to draw.
     /// \param edge_color The boundary color.
-    void addRingBoundary(const Ring& ring, const std::string& edge_color);
+    void addRingBoundary(const LinearRing& ring, const std::string& edge_color);
 
     /// \brief Add a filled overlay for a set of rings using odd-even filling.
     /// \param rings The rings that define the filled region.
