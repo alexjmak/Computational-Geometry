@@ -236,6 +236,22 @@ TEST(LineSegmentIntersectionTest, GroupsSortedIntersectionPointsBySegment) {
     EXPECT_TRUE(intersections[3].empty());
 }
 
+TEST(LineSegmentIntersectionTest, GroupsIntersectionPointsInOriginalSegmentDirection) {
+    const std::vector<Segment> segments = {
+        Segment(Point(6, 0), Point(0, 0)),
+        Segment(Point(4, -1), Point(4, 1)),
+        Segment(Point(2, -1), Point(2, 1)),
+    };
+
+    const std::vector<std::vector<Point>> intersections =
+        lineSegmentIntersectionBySegments(segments);
+
+    ASSERT_EQ(intersections.size(), segments.size());
+    EXPECT_EQ(intersections[0], std::vector<Point>({Point(4, 0), Point(2, 0)}));
+    EXPECT_EQ(intersections[1], std::vector<Point>({Point(4, 0)}));
+    EXPECT_EQ(intersections[2], std::vector<Point>({Point(2, 0)}));
+}
+
 TEST(LineSegmentIntersectionTest, KeepsDuplicateSegmentsDistinctInternally) {
     const std::vector<Segment> segments = {
         Segment(Point(0, 0), Point(4, 0)),

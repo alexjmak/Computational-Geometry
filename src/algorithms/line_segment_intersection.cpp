@@ -575,6 +575,9 @@ lineSegmentIntersectionBySegments(const std::vector<Segment>& segments) {
         std::vector<Point>& points = intersection_points_by_segments[id];
         std::sort(points.begin(), points.end());
         points.erase(std::unique(points.begin(), points.end()), points.end());
+        if (!segments[id].isCanonicalizedX()) {
+            std::reverse(points.begin(), points.end());
+        }
     }
 
     return intersection_points_by_segments;
