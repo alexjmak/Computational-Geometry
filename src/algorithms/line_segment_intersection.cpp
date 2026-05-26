@@ -89,8 +89,6 @@ struct ActiveSegmentCompare {
 class Event {
   public:
     std::vector<SegmentId> upper_segments;   ///< Segments whose upper endpoint is this event.
-    std::vector<SegmentId> mid_segments;     ///< Segments containing this event in their interior.
-    std::vector<SegmentId> lower_segments;   ///< Segments whose lower endpoint is this event.
     std::unordered_set<SegmentId> witnesses; ///< Segments that imply this event.
 
     /// \brief Store segments that start at an event and segments witnessing the event.
@@ -252,7 +250,7 @@ bool EventPoint::operator<(const EventPoint& other) const {
     return point.y > other.point.y;
 }
 
-Event::Event() : upper_segments(), mid_segments(), lower_segments(), witnesses() {}
+Event::Event() : upper_segments(), witnesses() {}
 
 /// \brief Insert a future intersection event for adjacent active segments when one exists.
 /// \param predecessor One active segment adjacent to the candidate event.
@@ -290,11 +288,12 @@ void findNewEvent(const ActiveSegment& predecessor, const ActiveSegment& success
 /// \brief Walk neighboring active segments and collect those touching an event point.
 /// \param ls_point The event point being processed.
 /// \param seed A known active segment touching the event point.
-/// \param curr_segments The active segment set to search.
-/// \param event The event payload to receive discovered mid and lower segment IDs.
+/// \param mid_segments Segments containing this event in their interior.
+/// \param lower_segments Segments whose lower endpoint is this event.
 /// \param find_succ True to walk successors, false to walk predecessors.
 void collectTouchingNeighbors(const EventPoint& ls_point, const ActiveSegment& seed,
-                              const State& line_sweep, Event& event, bool find_succ) {
+                              const State& line_sweep, std::vector<SegmentId>& mid_segments,
+                              std::vector<SegmentId>& lower_segments, bool find_succ) {
     const auto& curr_segments = line_sweep.curr_segments;
     const auto& segments_by_id = line_sweep.segments_by_id;
     SegmentId curr_segment_id = seed.id;
@@ -320,12 +319,12 @@ void collectTouchingNeighbors(const EventPoint& ls_point, const ActiveSegment& s
 #ifndef NDEBUG
             std::cout << "Found lower segment " << curr_segment.segment.toString() << std::endl;
 #endif
-            event.lower_segments.push_back(curr_segment_id);
+            lower_segments.push_back(curr_segment_id);
         } else if (isPointOnSegment(ls_point.point, curr_segment.segment)) {
 #ifndef NDEBUG
             std::cout << "Found mid segment " << curr_segment.segment.toString() << std::endl;
 #endif
-            event.mid_segments.push_back(curr_segment_id);
+            mid_segments.push_back(curr_segment_id);
         } else {
             break;
         }
@@ -336,8 +335,8 @@ void collectTouchingNeighbors(const EventPoint& ls_point, const ActiveSegment& s
 /// \param ls_point The event point being processed.
 /// \param event The event data associated with the point.
 /// \param line_sweep The sweep-line state to update.
-/// \returns True if more than one segment touches the event point.
-bool handleEventPoint(EventPoint& ls_point, Event& event, State& line_sweep) {
+/// \returns Segment IDs touching the event point.
+std::vector<SegmentId> handleEventPoint(EventPoint& ls_point, Event& event, State& line_sweep) {
 #ifndef NDEBUG
     std::cout << std::endl;
     std::cout << "Event: " << ls_point.point.toString() << std::endl;
@@ -345,6 +344,9 @@ bool handleEventPoint(EventPoint& ls_point, Event& event, State& line_sweep) {
 
     auto& curr_segments = line_sweep.curr_segments;
     const auto& segments_by_id = line_sweep.segments_by_id;
+    const auto& upper_segments = event.upper_segments;
+    std::vector<SegmentId> mid_segments;
+    std::vector<SegmentId> lower_segments;
 #ifndef NDEBUG
     std::cout << "Active segments before event:" << std::endl;
     for (SegmentId id : curr_segments) {
@@ -392,16 +394,18 @@ bool handleEventPoint(EventPoint& ls_point, Event& event, State& line_sweep) {
         const ActiveSegment& probe_segment = segments_by_id[*probe_segment_id];
         const Point& lower_endpoint = probe_segment.segment.start;
         if (lower_endpoint == ls_point.point) {
-            event.lower_segments.push_back(*probe_segment_id);
+            lower_segments.push_back(*probe_segment_id);
         } else if (isPointOnSegment(ls_point.point, probe_segment.segment)) {
-            event.mid_segments.push_back(*probe_segment_id);
+            mid_segments.push_back(*probe_segment_id);
         }
 
-        collectTouchingNeighbors(ls_point, probe_segment, line_sweep, event, true);
-        collectTouchingNeighbors(ls_point, probe_segment, line_sweep, event, false);
+        collectTouchingNeighbors(ls_point, probe_segment, line_sweep, mid_segments, lower_segments,
+                                 true);
+        collectTouchingNeighbors(ls_point, probe_segment, line_sweep, mid_segments, lower_segments,
+                                 false);
     }
 
-    for (SegmentId id : event.lower_segments) {
+    for (SegmentId id : lower_segments) {
         const ActiveSegment& s = segments_by_id[id];
 #ifndef NDEBUG
         std::cout << "Remove lower " << s.segment.toString() << std::endl;
@@ -409,7 +413,7 @@ bool handleEventPoint(EventPoint& ls_point, Event& event, State& line_sweep) {
         [[maybe_unused]] size_t count = curr_segments.erase(id);
         assert(count == 1);
     }
-    for (SegmentId id : event.mid_segments) {
+    for (SegmentId id : mid_segments) {
         const ActiveSegment& s = segments_by_id[id];
 #ifndef NDEBUG
         std::cout << "Remove mid " << s.segment.toString() << std::endl;
@@ -423,14 +427,14 @@ bool handleEventPoint(EventPoint& ls_point, Event& event, State& line_sweep) {
 
     // Add in the upper segments and re-add the mid_segments so that they will be in
     // the correct order in curr_segments.
-    for (SegmentId id : event.upper_segments) {
+    for (SegmentId id : upper_segments) {
         const ActiveSegment& s = segments_by_id[id];
 #ifndef NDEBUG
         std::cout << "Insert upper " << s.segment.toString() << std::endl;
 #endif
         curr_segments.insert(id);
     }
-    for (SegmentId id : event.mid_segments) {
+    for (SegmentId id : mid_segments) {
         const ActiveSegment& s = segments_by_id[id];
 #ifndef NDEBUG
         std::cout << "Insert mid " << s.segment.toString() << std::endl;
@@ -446,7 +450,7 @@ bool handleEventPoint(EventPoint& ls_point, Event& event, State& line_sweep) {
 #endif
 
     // Look for new events.
-    if (event.upper_segments.empty() && event.mid_segments.empty()) {
+    if (upper_segments.empty() && mid_segments.empty()) {
         if (probe_segment_id) {
             auto it = curr_segments.lower_bound(*probe_segment_id);
             if (it != curr_segments.begin() && it != curr_segments.end()) {
@@ -464,10 +468,10 @@ bool handleEventPoint(EventPoint& ls_point, Event& event, State& line_sweep) {
             if (!rightmost || compare_segment(*rightmost, id))
                 rightmost = id;
         };
-        for (SegmentId id : event.upper_segments) {
+        for (SegmentId id : upper_segments) {
             updateBoundarySegments(id);
         }
-        for (SegmentId id : event.mid_segments) {
+        for (SegmentId id : mid_segments) {
             updateBoundarySegments(id);
         }
 
@@ -484,17 +488,38 @@ bool handleEventPoint(EventPoint& ls_point, Event& event, State& line_sweep) {
         }
     }
 
-    if (event.upper_segments.size() + event.mid_segments.size() + event.lower_segments.size() > 1) {
-#ifndef NDEBUG
-        std::cout << "Intersection at " << ls_point.point.toString() << std::endl;
-#endif
-        return true;
-    }
+    std::vector<SegmentId> touching_segments;
+    touching_segments.reserve(upper_segments.size() + mid_segments.size() + lower_segments.size());
+    touching_segments.insert(touching_segments.end(), upper_segments.begin(), upper_segments.end());
+    touching_segments.insert(touching_segments.end(), mid_segments.begin(), mid_segments.end());
+    touching_segments.insert(touching_segments.end(), lower_segments.begin(), lower_segments.end());
 
-    return false;
+    return touching_segments;
 }
 
 } // namespace sweep
+
+template <typename IntersectionCallback>
+void forEachLineSegmentIntersection(const std::vector<Segment>& segments,
+                                    IntersectionCallback on_intersection) {
+    sweep::State ls;
+    ls.populateEventQueue(segments);
+
+    while (!ls.event_queue.empty()) {
+        auto it = ls.event_queue.begin();
+        sweep::EventPoint p = it->first;
+        sweep::Event e = std::move(it->second);
+        ls.event_queue.erase(it);
+
+        std::vector<sweep::SegmentId> touching_segments = sweep::handleEventPoint(p, e, ls);
+        if (touching_segments.size() > 1) {
+#ifndef NDEBUG
+            std::cout << "Intersection at " << p.point.toString() << std::endl;
+#endif
+            on_intersection(p.point, touching_segments);
+        }
+    }
+}
 
 std::unordered_set<Point> bruteForceLineSegmentIntersection(const std::vector<Segment>& segments) {
     std::unordered_set<Point> intersections;
@@ -525,19 +550,32 @@ std::unordered_set<Point> bruteForceLineSegmentIntersection(const std::vector<Se
 }
 
 std::unordered_set<Point> lineSegmentIntersection(const std::vector<Segment>& segments) {
-    sweep::State ls;
-    ls.populateEventQueue(segments);
-
     std::unordered_set<Point> intersection_points;
-    while (!ls.event_queue.empty()) {
-        auto it = ls.event_queue.begin();
-        sweep::EventPoint p = it->first;
-        sweep::Event e = std::move(it->second);
-        ls.event_queue.erase(it);
-
-        if (sweep::handleEventPoint(p, e, ls)) {
-            intersection_points.insert(p.point);
-        }
-    }
+    forEachLineSegmentIntersection(
+        segments, [&](const Point& point, const std::vector<sweep::SegmentId>&) {
+            intersection_points.insert(point);
+        });
     return intersection_points;
+}
+
+std::vector<std::vector<Point>>
+lineSegmentIntersectionBySegments(const std::vector<Segment>& segments) {
+    std::vector<std::vector<Point>> intersection_points_by_segments;
+    intersection_points_by_segments.resize(segments.size());
+
+    forEachLineSegmentIntersection(
+        segments, [&](const Point& point, const std::vector<sweep::SegmentId>& touching_segments) {
+            for (sweep::SegmentId id : touching_segments) {
+                intersection_points_by_segments[id].push_back(point);
+            }
+        });
+
+    // Sort points so that they are in order
+    for (std::size_t id = 0; id < intersection_points_by_segments.size(); id++) {
+        std::vector<Point>& points = intersection_points_by_segments[id];
+        std::sort(points.begin(), points.end());
+        points.erase(std::unique(points.begin(), points.end()), points.end());
+    }
+
+    return intersection_points_by_segments;
 }

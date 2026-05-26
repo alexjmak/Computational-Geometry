@@ -16,4 +16,10 @@ std::unordered_set<Point> bruteForceLineSegmentIntersection(const std::vector<Se
 /// \returns A set containing every unique intersection point found.
 std::unordered_set<Point> lineSegmentIntersection(const std::vector<Segment>& segments);
 
+/// \brief Find intersection points grouped by input segment using a sweep line.
+/// \param segments The segments to test for intersections.
+/// \returns A vector indexed by segment ID, with each segment's intersection points sorted.
+std::vector<std::vector<Point>>
+lineSegmentIntersectionBySegments(const std::vector<Segment>& segments);
+
 #endif // LINE_SEGMENT_INTERSECTION_HPP
