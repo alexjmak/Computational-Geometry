@@ -8,8 +8,12 @@
 #include <optional>
 #include <set>
 #include <stdexcept>
+#include <unordered_set>
+#include <vector>
 
 namespace sweep {
+
+using SegmentId = std::size_t;
 
 /// \brief Event point wrapper ordered in sweep processing order.
 class EventPoint {
@@ -43,9 +47,8 @@ class State;
 /// \brief Segment wrapper with sweep-state-dependent cached ordering data.
 class ActiveSegment {
   public:
-    std::size_t id;             ///< The original input segment index.
-    Segment segment;            ///< The canonicalized segment represented in the active set.
-    State* line_sweep;          ///< The owning sweep-line state.
+    SegmentId id;               ///< The original input segment index.
+    Segment segment;            ///< The canonicalized segment represented by this ID.
     Rational slope_inverse;     ///< The finite inverse slope used for tie-breaking.
     int slope_inverse_infinity; ///< Direction marker for horizontal segment ordering.
     mutable std::optional<Point> cached_event; ///< The event point for the cached intersection.
@@ -54,44 +57,41 @@ class ActiveSegment {
     /// \brief Wrap a segment with sweep-specific cached data.
     /// \param id The original input segment index.
     /// \param segment The segment represented in the active set.
-    /// \param line_sweep The owning sweep-line state.
-    ActiveSegment(std::size_t id, const Segment& segment, State* line_sweep);
+    ActiveSegment(SegmentId id, const Segment& segment);
 
-    /// \brief Return this segment's intersection with the current sweep line.
+    /// \brief Return this segment's intersection with the sweep line through an event.
+    /// \param event_point The event point whose horizontal sweep line is being evaluated.
     /// \returns The point where the segment meets the current event's horizontal line.
-    std::optional<Point> pointAtCurrEvent() const;
+    std::optional<Point> pointAtEvent(const Point& event_point) const;
 
-    /// \brief Check whether two active segments represent the same sweep segment.
+    /// \brief Check whether two active segments represent the same sweep segment by checking id.
     /// \param other The active segment to compare against.
-    /// \returns True if both wrappers contain the same segment and sweep state.
+    /// \returns True if both have the same id.
     bool operator==(const ActiveSegment& other) const;
-};
-
-/// \brief Hash active segments by their original input identity.
-struct ActiveSegmentHash {
-    /// \brief Hash an active segment by its original input identity.
-    /// \param s The active segment to hash.
-    /// \returns A hash derived from the original input segment index.
-    size_t operator()(const ActiveSegment& s) const {
-        return std::hash<std::size_t>{}(s.id);
-    }
 };
 
 /// \brief Compare active segments at the current sweep event.
 struct ActiveSegmentCompare {
+    const State* line_sweep; ///< The sweep-line state used to resolve segment IDs.
+
+    /// \brief Initialize a comparator for one sweep-line state.
+    /// \param line_sweep The state containing segment geometry and the current event.
+    explicit ActiveSegmentCompare(const State* line_sweep);
+
     /// \brief Order active segments at the current sweep event.
-    /// \param a The first active segment.
-    /// \param b The second active segment.
-    /// \returns True if a should appear before b in the active set.
-    bool operator()(const ActiveSegment& a, const ActiveSegment& b) const;
+    /// \param a_id The first active segment ID.
+    /// \param b_id The second active segment ID.
+    /// \returns True if a_id should appear before b_id in the active set.
+    bool operator()(SegmentId a_id, SegmentId b_id) const;
 };
 
 /// \brief Event-queue payload for one geometric event point.
 class Event {
   public:
-    std::vector<ActiveSegment> upper_segments; ///< Segments whose upper endpoint is this event.
-    std::unordered_set<ActiveSegment, ActiveSegmentHash>
-        witnesses; ///< Segments that imply this event.
+    std::vector<SegmentId> upper_segments;   ///< Segments whose upper endpoint is this event.
+    std::vector<SegmentId> mid_segments;     ///< Segments containing this event in their interior.
+    std::vector<SegmentId> lower_segments;   ///< Segments whose lower endpoint is this event.
+    std::unordered_set<SegmentId> witnesses; ///< Segments that imply this event.
 
     /// \brief Store segments that start at an event and segments witnessing the event.
     Event();
@@ -106,7 +106,8 @@ class State {
     ///
     /// Remove affected segments before moving curr_event, then insert/reinsert segments
     /// that remain active below the event.
-    std::set<ActiveSegment, ActiveSegmentCompare> curr_segments;
+    std::vector<ActiveSegment> segments_by_id; ///< Canonicalized active segment by input index.
+    std::set<SegmentId, ActiveSegmentCompare> curr_segments;
 
     /// \brief Initialize the sweep-line state and active/event containers.
     State();
@@ -116,8 +117,8 @@ class State {
     void populateEventQueue(const std::vector<Segment>& segments);
 
     /// \brief Print an active segment and its current sweep-line intersection point.
-    /// \param key The active segment to print.
-    void printElement(const ActiveSegment& key);
+    /// \param id The active segment ID to print.
+    void printElement(SegmentId id);
 };
 
 /// \brief Compare the inverse slopes of two active segments.
@@ -140,36 +141,41 @@ int compareSlopeInverse(const ActiveSegment& a, const ActiveSegment& b) {
     return 0;
 }
 
-State::State() : curr_event(EventPoint(Point(INT_MAX, INT_MAX))) {}
+State::State()
+    : curr_event(EventPoint(Point(INT_MAX, INT_MAX))), segments_by_id(),
+      curr_segments(ActiveSegmentCompare(this)) {}
 
 void State::populateEventQueue(const std::vector<Segment>& segments) {
     // Insert segment's upper endpoints into the event queue, and keep track of which
     // segments they belong to.
-    for (std::size_t id = 0; id < segments.size(); ++id) {
-        ActiveSegment lss(id, segments[id].canonicalizedY(), this);
+    segments_by_id.reserve(segments.size());
+    for (SegmentId id = 0; id < segments.size(); ++id) {
+        segments_by_id.emplace_back(id, segments[id].canonicalizedY());
+        const ActiveSegment& lss = segments_by_id.back();
         EventPoint upper_endpoint(lss.segment.end);
         EventPoint lower_endpoint(lss.segment.start);
         auto& upper_event = event_queue.try_emplace(upper_endpoint).first->second;
-        upper_event.upper_segments.push_back(lss);
+        upper_event.upper_segments.push_back(id);
         auto& lower_event = event_queue.try_emplace(lower_endpoint).first->second;
-        lower_event.witnesses.insert(lss);
+        lower_event.witnesses.insert(id);
     }
     if (!event_queue.empty()) {
         curr_event = event_queue.begin()->first;
     }
 }
 
-void State::printElement(const ActiveSegment& key) {
-    auto point = key.pointAtCurrEvent();
+void State::printElement(SegmentId id) {
+    const ActiveSegment& key = segments_by_id[id];
+    auto point = key.pointAtEvent(curr_event.point);
     if (point) {
         std::cout << "#" << key.id << " " << key.segment.toString() << ": " << point->toString()
                   << std::endl;
     }
 }
 
-ActiveSegment::ActiveSegment(std::size_t id, const Segment& segment, State* line_sweep)
-    : id(id), segment(segment), line_sweep(line_sweep), slope_inverse(0), slope_inverse_infinity(0),
-      cached_event(), cached_point_at_event() {
+ActiveSegment::ActiveSegment(SegmentId id, const Segment& segment)
+    : id(id), segment(segment), slope_inverse(0), slope_inverse_infinity(0), cached_event(),
+      cached_point_at_event() {
     Rational dx = segment.start.x - segment.end.x;
     Rational dy = segment.start.y - segment.end.y;
     if (dy != 0) {
@@ -180,8 +186,7 @@ ActiveSegment::ActiveSegment(std::size_t id, const Segment& segment, State* line
     }
 }
 
-std::optional<Point> ActiveSegment::pointAtCurrEvent() const {
-    const Point& event_point = line_sweep->curr_event.point;
+std::optional<Point> ActiveSegment::pointAtEvent(const Point& event_point) const {
     if (cached_event && *cached_event == event_point) {
         return cached_point_at_event;
     }
@@ -192,13 +197,17 @@ std::optional<Point> ActiveSegment::pointAtCurrEvent() const {
 }
 
 bool ActiveSegment::operator==(const ActiveSegment& other) const {
-    return id == other.id && line_sweep == other.line_sweep;
+    return id == other.id;
 }
 
-bool ActiveSegmentCompare::operator()(const ActiveSegment& a, const ActiveSegment& b) const {
-    auto point_at_y = a.pointAtCurrEvent();
-    auto other_point_at_y = b.pointAtCurrEvent();
-    const Point& event_point = a.line_sweep->curr_event.point;
+ActiveSegmentCompare::ActiveSegmentCompare(const State* line_sweep) : line_sweep(line_sweep) {}
+
+bool ActiveSegmentCompare::operator()(SegmentId a_id, SegmentId b_id) const {
+    const ActiveSegment& a = line_sweep->segments_by_id[a_id];
+    const ActiveSegment& b = line_sweep->segments_by_id[b_id];
+    const Point& event_point = line_sweep->curr_event.point;
+    auto point_at_y = a.pointAtEvent(event_point);
+    auto other_point_at_y = b.pointAtEvent(event_point);
 
     if (!point_at_y || !other_point_at_y) {
         throw std::runtime_error(
@@ -243,7 +252,7 @@ bool EventPoint::operator<(const EventPoint& other) const {
     return point.y > other.point.y;
 }
 
-Event::Event() : upper_segments(), witnesses() {}
+Event::Event() : upper_segments(), mid_segments(), lower_segments(), witnesses() {}
 
 /// \brief Insert a future intersection event for adjacent active segments when one exists.
 /// \param predecessor One active segment adjacent to the candidate event.
@@ -263,8 +272,8 @@ void findNewEvent(const ActiveSegment& predecessor, const ActiveSegment& success
 
     if (line_sweep.event_queue.find(ls_intersect_point) != line_sweep.event_queue.end()) {
         auto& event = line_sweep.event_queue[ls_intersect_point];
-        event.witnesses.insert(successor);
-        event.witnesses.insert(predecessor);
+        event.witnesses.insert(successor.id);
+        event.witnesses.insert(predecessor.id);
         return;
     }
 
@@ -274,25 +283,24 @@ void findNewEvent(const ActiveSegment& predecessor, const ActiveSegment& success
 #endif
 
     auto& event = line_sweep.event_queue.try_emplace(ls_intersect_point).first->second;
-    event.witnesses.insert(successor);
-    event.witnesses.insert(predecessor);
+    event.witnesses.insert(successor.id);
+    event.witnesses.insert(predecessor.id);
 }
 
 /// \brief Walk neighboring active segments and collect those touching an event point.
 /// \param ls_point The event point being processed.
 /// \param seed A known active segment touching the event point.
 /// \param curr_segments The active segment set to search.
-/// \param mid_segments Output list for segments containing the event in their interior.
-/// \param lower_segments Output list for segments whose lower endpoint is the event.
+/// \param event The event payload to receive discovered mid and lower segment IDs.
 /// \param find_succ True to walk successors, false to walk predecessors.
 void collectTouchingNeighbors(const EventPoint& ls_point, const ActiveSegment& seed,
-                              std::set<ActiveSegment, ActiveSegmentCompare>& curr_segments,
-                              std::vector<ActiveSegment>& mid_segments,
-                              std::vector<ActiveSegment>& lower_segments, bool find_succ) {
-    ActiveSegment curr_segment = seed;
+                              const State& line_sweep, Event& event, bool find_succ) {
+    const auto& curr_segments = line_sweep.curr_segments;
+    const auto& segments_by_id = line_sweep.segments_by_id;
+    SegmentId curr_segment_id = seed.id;
     while (true) {
-        auto it = find_succ ? curr_segments.upper_bound(curr_segment)
-                            : curr_segments.lower_bound(curr_segment);
+        auto it = find_succ ? curr_segments.upper_bound(curr_segment_id)
+                            : curr_segments.lower_bound(curr_segment_id);
         if (find_succ) {
             if (it == curr_segments.end()) {
                 break;
@@ -304,19 +312,20 @@ void collectTouchingNeighbors(const EventPoint& ls_point, const ActiveSegment& s
             --it;
         }
 
-        curr_segment = *it;
+        curr_segment_id = *it;
+        const ActiveSegment& curr_segment = segments_by_id[curr_segment_id];
 
         const Point& lower_endpoint = curr_segment.segment.start;
         if (lower_endpoint == ls_point.point) {
 #ifndef NDEBUG
             std::cout << "Found lower segment " << curr_segment.segment.toString() << std::endl;
 #endif
-            lower_segments.push_back(curr_segment);
+            event.lower_segments.push_back(curr_segment_id);
         } else if (isPointOnSegment(ls_point.point, curr_segment.segment)) {
 #ifndef NDEBUG
             std::cout << "Found mid segment " << curr_segment.segment.toString() << std::endl;
 #endif
-            mid_segments.push_back(curr_segment);
+            event.mid_segments.push_back(curr_segment_id);
         } else {
             break;
         }
@@ -334,27 +343,25 @@ bool handleEventPoint(EventPoint& ls_point, Event& event, State& line_sweep) {
     std::cout << "Event: " << ls_point.point.toString() << std::endl;
 #endif
 
-    std::vector<ActiveSegment> upper_segments = std::move(event.upper_segments);
-    std::vector<ActiveSegment> mid_segments;
-    std::vector<ActiveSegment> lower_segments;
-
     auto& curr_segments = line_sweep.curr_segments;
+    const auto& segments_by_id = line_sweep.segments_by_id;
 #ifndef NDEBUG
     std::cout << "Active segments before event:" << std::endl;
-    for (const auto& segment : curr_segments) {
-        line_sweep.printElement(segment);
+    for (SegmentId id : curr_segments) {
+        line_sweep.printElement(id);
     }
 #endif
 
     // Populate all segments touching the event point on the lower point or anywhere in
     // the middle. These are all adjacent in curr_segments, and we use a known probe
     // segment to query the remaining ones.
-    std::optional<ActiveSegment> probe_segment;
+    std::optional<SegmentId> probe_segment_id;
     if (!event.witnesses.empty()) {
-        probe_segment = *event.witnesses.begin();
+        probe_segment_id = *event.witnesses.begin();
     } else {
-        ActiveSegment dummy_segment(static_cast<std::size_t>(-1),
-                                    Segment(ls_point.point, ls_point.point), &line_sweep);
+        const SegmentId dummy_segment_id = segments_by_id.size();
+        line_sweep.segments_by_id.emplace_back(dummy_segment_id,
+                                               Segment(ls_point.point, ls_point.point));
         EventPoint prev_event = line_sweep.curr_event;
         line_sweep.curr_event = ls_point;
 
@@ -362,49 +369,52 @@ bool handleEventPoint(EventPoint& ls_point, Event& event, State& line_sweep) {
         // fall in the active-set ordering. A touching segment should be adjacent to that
         // position, but it may sort just before or just after the dummy because ties are
         // broken by slope.
-        auto it = curr_segments.lower_bound(dummy_segment);
+        auto it = curr_segments.lower_bound(dummy_segment_id);
         if (it != curr_segments.begin()) {
             auto floor_it = std::prev(it);
-            if (isPointOnSegment(ls_point.point, floor_it->segment)) {
-                probe_segment = *floor_it;
+            if (isPointOnSegment(ls_point.point, segments_by_id[*floor_it].segment)) {
+                probe_segment_id = *floor_it;
             }
         }
 
-        if (!probe_segment) {
-            if (it != curr_segments.end() && isPointOnSegment(ls_point.point, it->segment)) {
-                probe_segment = *it;
+        if (!probe_segment_id) {
+            if (it != curr_segments.end() &&
+                isPointOnSegment(ls_point.point, segments_by_id[*it].segment)) {
+                probe_segment_id = *it;
             }
         }
 
         line_sweep.curr_event = prev_event;
+        line_sweep.segments_by_id.pop_back();
     }
 
-    if (probe_segment) {
-        const Point& lower_endpoint = probe_segment->segment.start;
+    if (probe_segment_id) {
+        const ActiveSegment& probe_segment = segments_by_id[*probe_segment_id];
+        const Point& lower_endpoint = probe_segment.segment.start;
         if (lower_endpoint == ls_point.point) {
-            lower_segments.push_back(*probe_segment);
-        } else if (isPointOnSegment(ls_point.point, probe_segment->segment)) {
-            mid_segments.push_back(*probe_segment);
+            event.lower_segments.push_back(*probe_segment_id);
+        } else if (isPointOnSegment(ls_point.point, probe_segment.segment)) {
+            event.mid_segments.push_back(*probe_segment_id);
         }
 
-        collectTouchingNeighbors(ls_point, *probe_segment, curr_segments, mid_segments,
-                                 lower_segments, true);
-        collectTouchingNeighbors(ls_point, *probe_segment, curr_segments, mid_segments,
-                                 lower_segments, false);
+        collectTouchingNeighbors(ls_point, probe_segment, line_sweep, event, true);
+        collectTouchingNeighbors(ls_point, probe_segment, line_sweep, event, false);
     }
 
-    for (ActiveSegment& s : lower_segments) {
+    for (SegmentId id : event.lower_segments) {
+        const ActiveSegment& s = segments_by_id[id];
 #ifndef NDEBUG
         std::cout << "Remove lower " << s.segment.toString() << std::endl;
 #endif
-        [[maybe_unused]] size_t count = curr_segments.erase(s);
+        [[maybe_unused]] size_t count = curr_segments.erase(id);
         assert(count == 1);
     }
-    for (ActiveSegment& s : mid_segments) {
+    for (SegmentId id : event.mid_segments) {
+        const ActiveSegment& s = segments_by_id[id];
 #ifndef NDEBUG
         std::cout << "Remove mid " << s.segment.toString() << std::endl;
 #endif
-        [[maybe_unused]] size_t count = curr_segments.erase(s);
+        [[maybe_unused]] size_t count = curr_segments.erase(id);
         assert(count == 1);
     }
 
@@ -413,66 +423,68 @@ bool handleEventPoint(EventPoint& ls_point, Event& event, State& line_sweep) {
 
     // Add in the upper segments and re-add the mid_segments so that they will be in
     // the correct order in curr_segments.
-    for (auto& s : upper_segments) {
+    for (SegmentId id : event.upper_segments) {
+        const ActiveSegment& s = segments_by_id[id];
 #ifndef NDEBUG
         std::cout << "Insert upper " << s.segment.toString() << std::endl;
 #endif
-        curr_segments.insert(s);
+        curr_segments.insert(id);
     }
-    for (auto& s : mid_segments) {
+    for (SegmentId id : event.mid_segments) {
+        const ActiveSegment& s = segments_by_id[id];
 #ifndef NDEBUG
         std::cout << "Insert mid " << s.segment.toString() << std::endl;
 #endif
-        curr_segments.insert(s);
+        curr_segments.insert(id);
     }
 
 #ifndef NDEBUG
     std::cout << "Active segments after event:" << std::endl;
-    for (const auto& segment : curr_segments) {
-        line_sweep.printElement(segment);
+    for (SegmentId id : curr_segments) {
+        line_sweep.printElement(id);
     }
 #endif
 
     // Look for new events.
-    if (upper_segments.empty() && mid_segments.empty()) {
-        if (probe_segment) {
-            auto it = curr_segments.lower_bound(*probe_segment);
+    if (event.upper_segments.empty() && event.mid_segments.empty()) {
+        if (probe_segment_id) {
+            auto it = curr_segments.lower_bound(*probe_segment_id);
             if (it != curr_segments.begin() && it != curr_segments.end()) {
                 auto prev_it = std::prev(it);
-                findNewEvent(*prev_it, *it, ls_point, line_sweep);
+                findNewEvent(segments_by_id[*prev_it], segments_by_id[*it], ls_point, line_sweep);
             }
         }
     } else {
-        ActiveSegmentCompare compare_segment;
-        ActiveSegment* leftmost = nullptr;
-        ActiveSegment* rightmost = nullptr;
-        auto updateBoundarySegments = [&](ActiveSegment& s) {
-            if (!leftmost || compare_segment(s, *leftmost))
-                leftmost = &s;
-            if (!rightmost || compare_segment(*rightmost, s))
-                rightmost = &s;
+        ActiveSegmentCompare compare_segment = curr_segments.key_comp();
+        std::optional<SegmentId> leftmost;
+        std::optional<SegmentId> rightmost;
+        auto updateBoundarySegments = [&](SegmentId id) {
+            if (!leftmost || compare_segment(id, *leftmost))
+                leftmost = id;
+            if (!rightmost || compare_segment(*rightmost, id))
+                rightmost = id;
         };
-        for (ActiveSegment& s : upper_segments) {
-            updateBoundarySegments(s);
+        for (SegmentId id : event.upper_segments) {
+            updateBoundarySegments(id);
         }
-        for (ActiveSegment& s : mid_segments) {
-            updateBoundarySegments(s);
+        for (SegmentId id : event.mid_segments) {
+            updateBoundarySegments(id);
         }
 
         auto it = curr_segments.find(*leftmost);
         if (it != curr_segments.begin()) {
             --it;
-            findNewEvent(*it, *leftmost, ls_point, line_sweep);
+            findNewEvent(segments_by_id[*it], segments_by_id[*leftmost], ls_point, line_sweep);
         }
 
         it = curr_segments.find(*rightmost);
         ++it;
         if (it != curr_segments.end()) {
-            findNewEvent(*rightmost, *it, ls_point, line_sweep);
+            findNewEvent(segments_by_id[*rightmost], segments_by_id[*it], ls_point, line_sweep);
         }
     }
 
-    if (upper_segments.size() + mid_segments.size() + lower_segments.size() > 1) {
+    if (event.upper_segments.size() + event.mid_segments.size() + event.lower_segments.size() > 1) {
 #ifndef NDEBUG
         std::cout << "Intersection at " << ls_point.point.toString() << std::endl;
 #endif
