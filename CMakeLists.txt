@@ -69,6 +69,7 @@ add_library(
     src/algorithms/assemble.cpp
     src/algorithms/convex_hull.cpp
     src/algorithms/line_segment_intersection.cpp
+    src/algorithms/overlay.cpp
     src/io/document.cpp
     src/io/geometry_io.cpp
 )

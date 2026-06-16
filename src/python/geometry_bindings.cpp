@@ -48,6 +48,7 @@ void bindGeometry(py::module_& module) {
         .def_readwrite("y", &Vect2::y)
         .def("__repr__", [](const Vect2& vect2) { return vect2.toString(); })
         .def("__eq__", &Vect2::operator==)
+        .def("__hash__", [](const Vect2& vect2) { return std::hash<Vect2>{}(vect2); })
         .def("__lt__", &Vect2::operator<)
         .def("__add__", &Vect2::operator+)
         .def("__sub__", [](const Vect2& lhs, const Vect2& rhs) { return lhs - rhs; })
@@ -64,6 +65,7 @@ void bindGeometry(py::module_& module) {
         .def("canonicalized_y", &Segment::canonicalizedY)
         .def("__repr__", [](const Segment& segment) { return segment.toString(); })
         .def("__eq__", &Segment::operator==)
+        .def("__hash__", [](const Segment& segment) { return std::hash<Segment>{}(segment); })
         .def("__lt__", &Segment::operator<);
     total_ordering(module.attr("Segment"));
 

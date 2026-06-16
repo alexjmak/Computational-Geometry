@@ -551,10 +551,10 @@ std::unordered_set<Point> bruteForceLineSegmentIntersection(const std::vector<Se
 
 std::unordered_set<Point> lineSegmentIntersection(const std::vector<Segment>& segments) {
     std::unordered_set<Point> intersection_points;
-    forEachLineSegmentIntersection(
-        segments, [&](const Point& point, const std::vector<sweep::SegmentId>&) {
-            intersection_points.insert(point);
-        });
+    forEachLineSegmentIntersection(segments,
+                                   [&](const Point& point, const std::vector<sweep::SegmentId>&) {
+                                       intersection_points.insert(point);
+                                   });
     return intersection_points;
 }
 

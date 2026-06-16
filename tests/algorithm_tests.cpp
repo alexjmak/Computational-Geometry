@@ -1,6 +1,7 @@
 #include "algorithms/assemble.hpp"
 #include "algorithms/convex_hull.hpp"
 #include "algorithms/line_segment_intersection.hpp"
+#include "algorithms/overlay.hpp"
 #include "geometry/polygon.hpp"
 #include <algorithm>
 #include <gtest/gtest.h>
@@ -12,6 +13,10 @@ namespace {
 
 std::unordered_set<Point> pointSet(const std::vector<Point>& points) {
     return std::unordered_set<Point>(points.begin(), points.end());
+}
+
+std::unordered_set<Segment> segmentSet(const std::vector<Segment>& segments) {
+    return std::unordered_set<Segment>(segments.begin(), segments.end());
 }
 
 std::string pointSetString(const std::unordered_set<Point>& points) {
@@ -29,12 +34,35 @@ std::string pointSetString(const std::unordered_set<Point>& points) {
     return ret;
 }
 
+std::string segmentSetString(const std::unordered_set<Segment>& segments) {
+    std::vector<Segment> sorted_segments(segments.begin(), segments.end());
+    std::sort(sorted_segments.begin(), sorted_segments.end());
+
+    std::string ret = "{";
+    for (std::size_t i = 0; i < sorted_segments.size(); ++i) {
+        if (i > 0) {
+            ret += ", ";
+        }
+        ret += sorted_segments[i].toString();
+    }
+    ret += "}";
+    return ret;
+}
+
 void expectPointSetsEqual(const std::string& algorithm_name,
                           const std::unordered_set<Point>& actual,
                           const std::unordered_set<Point>& expected) {
     EXPECT_EQ(actual, expected) << algorithm_name << " intersections\n"
                                 << "  actual:   " << pointSetString(actual) << "\n"
                                 << "  expected: " << pointSetString(expected);
+}
+
+void expectSegmentSetsEqual(const std::string& algorithm_name,
+                            const std::unordered_set<Segment>& actual,
+                            const std::unordered_set<Segment>& expected) {
+    EXPECT_EQ(actual, expected) << algorithm_name << " segments\n"
+                                << "  actual:   " << segmentSetString(actual) << "\n"
+                                << "  expected: " << segmentSetString(expected);
 }
 
 void expectIntersections(const std::vector<Segment>& segments,
@@ -268,4 +296,21 @@ TEST(LineSegmentIntersectionTest, KeepsReversedDuplicateSegmentsDistinctInternal
     };
 
     expectIntersections(segments, {Point(0, 0), Point(4, 0)});
+}
+
+TEST(PlanarizeSegmentsTest, SplitsCrossingSegmentsAtIntersection) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(4, 4)),
+        Segment(Point(0, 4), Point(4, 0)),
+    };
+
+    const std::vector<Segment> planarized = planarizeSegments(segments);
+
+    expectSegmentSetsEqual("planarizeSegments", segmentSet(planarized),
+                           segmentSet({
+                               Segment(Point(0, 0), Point(2, 2)),
+                               Segment(Point(2, 2), Point(4, 4)),
+                               Segment(Point(0, 4), Point(2, 2)),
+                               Segment(Point(2, 2), Point(4, 0)),
+                           }));
 }

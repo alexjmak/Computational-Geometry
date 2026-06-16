@@ -1,6 +1,7 @@
 #include "algorithms/assemble.hpp"
 #include "algorithms/convex_hull.hpp"
 #include "algorithms/line_segment_intersection.hpp"
+#include "algorithms/overlay.hpp"
 #include "geometry/random.hpp"
 #include "python/bindings.hpp"
 #include <algorithm>
@@ -64,4 +65,7 @@ void bindAlgorithms(py::module_& module) {
     module.def("random_segments", &randomSegmentsPython, py::arg("count"),
                py::arg("seed") = py::none(), py::arg("min_length") = 1, py::arg("max_length") = 40,
                py::arg("min_coord") = 1, py::arg("max_coord") = 1000);
+    module.def("planarize_segments",
+               py::overload_cast<const std::vector<Segment>&>(&planarizeSegments),
+               py::arg("segments"));
 }
