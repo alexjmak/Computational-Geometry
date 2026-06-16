@@ -140,22 +140,7 @@ class DCEL {
     /// \returns A face-indexed depth vector; unreachable faces keep DCEL::npos.
     std::vector<std::size_t> faceDepths() const;
 
-    /// \brief Build a DCEL from polygon boundary rings.
-    /// \param polygons The polygons whose boundaries should populate the DCEL.
-    /// \returns A DCEL containing vertices, half-edges, and faces for the polygons.
-    static DCEL fromPolygons(const std::vector<Polygon>& polygons);
-
-    /// \brief Build a DCEL from boundary rings.
-    /// \param rings The boundary rings to populate the DCEL.
-    /// \returns A DCEL containing vertices, half-edges, and faces for the rings.
-    static DCEL fromRings(const std::vector<const LinearRing*>& rings);
-
-    /// \brief Build a DCEL from boundary rings.
-    /// \param rings The boundary rings to populate the DCEL.
-    /// \returns A DCEL containing vertices, half-edges, and faces for the rings.
-    static DCEL fromRings(const std::vector<LinearRing>& rings);
-
-    /// \brief Build a DCEL from segments by assembling them into rings.
+    /// \brief Build a DCEL from segments.
     /// \param segments The segments to populate the DCEL.
     /// \returns A DCEL containing vertices, half-edges, and faces for the segments.
     static DCEL fromSegments(const std::vector<Segment>& segments);

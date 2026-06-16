@@ -84,6 +84,11 @@ class Polygon {
     bool operator==(const Polygon& other) const;
 };
 
+/// \brief Convert polygon boundaries into directed segments.
+/// \param polygons The polygons whose outer and inner rings should be converted.
+/// \returns A flat list containing all boundary segments from all polygon rings.
+std::vector<Segment> toSegments(const std::vector<Polygon>& polygons);
+
 /// \brief Axis-aligned rectangle represented by exact corner coordinates.
 class Rectangle {
   public:

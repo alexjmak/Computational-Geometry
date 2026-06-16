@@ -151,7 +151,7 @@ TEST(DCELTest, CreatesDCELFromPolygons) {
     const LinearRing hole({Point(1, 1), Point(1, 2), Point(2, 2), Point(2, 1)});
     const Polygon polygon(outer, {hole});
 
-    const DCEL dcel = DCEL::fromPolygons({polygon});
+    const DCEL dcel = DCEL::fromSegments(toSegments({polygon}));
 
     EXPECT_EQ(dcel.pointCount(), 8);
     EXPECT_EQ(dcel.halfEdgeCount(), 16);
@@ -194,7 +194,7 @@ TEST(DCELTest, CreatesFacesForDonutWithIsland) {
     const LinearRing island_outer({Point(4, 4), Point(6, 4), Point(6, 6), Point(4, 6)});
     const Polygon island(island_outer);
 
-    const DCEL dcel = DCEL::fromPolygons({donut, island});
+    const DCEL dcel = DCEL::fromSegments(toSegments({donut, island}));
 
     EXPECT_EQ(dcel.pointCount(), 12);
     EXPECT_EQ(dcel.halfEdgeCount(), 24);
@@ -229,7 +229,7 @@ TEST(DCELTest, ReusesHalfEdgesForPolygonsSharingEdge) {
     const Polygon left(Rectangle(Point(0, 0), Point(1, 1)).ring());
     const Polygon right(Rectangle(Point(1, 0), Point(2, 1)).ring());
 
-    const DCEL dcel = DCEL::fromPolygons({left, right});
+    const DCEL dcel = DCEL::fromSegments(toSegments({left, right}));
 
     EXPECT_EQ(dcel.pointCount(), 6);
     EXPECT_EQ(dcel.halfEdgeCount(), 14);
@@ -254,7 +254,7 @@ TEST(DCELTest, HandlesThreeRectanglesTouchingAtPoints) {
     const Polygon middle(Rectangle(Point(1, 1), Point(2, 2)).ring());
     const Polygon upper_right(Rectangle(Point(2, 2), Point(3, 3)).ring());
 
-    const DCEL dcel = DCEL::fromPolygons({lower_left, middle, upper_right});
+    const DCEL dcel = DCEL::fromSegments(toSegments({lower_left, middle, upper_right}));
 
     EXPECT_EQ(dcel.pointCount(), 10);
     EXPECT_EQ(dcel.halfEdgeCount(), 24);

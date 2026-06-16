@@ -35,6 +35,17 @@ double ccwAngle(const Vect2& p, const Vect2& q);
 /// \returns The clockwise angle in radians in the range [0, 2pi).
 double cwAngle(const Vect2& p, const Vect2& q);
 
+/// \brief Classify a vector into the upper or lower angular half-plane.
+/// \param v The vector to classify.
+/// \returns 0 for the upper half-plane including the positive x-axis, otherwise 1.
+int halfPlane(const Vect2& v);
+
+/// \brief Compare two vectors by counterclockwise angular order from the positive x-axis.
+/// \param a The first vector to compare.
+/// \param b The second vector to compare.
+/// \returns True if a appears before b in counterclockwise angular order.
+bool angleComparator(const Vect2& a, const Vect2& b);
+
 /// \brief Determine the orientation of three points.
 /// \param p The first point.
 /// \param q The second point.

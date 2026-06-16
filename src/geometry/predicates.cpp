@@ -28,6 +28,36 @@ double cwAngle(const Vect2& p, const Vect2& q) {
     return ccwAngle(q, p);
 }
 
+int halfPlane(const Vect2& v) {
+    // Split the circle at the positive x-axis so angular comparison becomes a
+    // strict linear order: upper half-plane first, then lower half-plane.
+    if (v.y > 0 || (v.y == 0 && v.x > 0)) {
+        return 0;
+    }
+    return 1;
+}
+
+bool angleComparator(const Vect2& a, const Vect2& b) {
+    // Check if two vectors are on different half-planes
+    // ex: a's angle is between 0 and pi and b's angle is between pi and 2*pi
+    int ha = halfPlane(a);
+    int hb = halfPlane(b);
+    if (ha != hb) {
+        return ha < hb;
+    }
+
+    // Both vectors are on the same half-plane, use cross produce to determine order
+    Rational cross = crossProduct(a, b);
+    if (cross != 0) {
+        return cross > 0;
+    }
+
+    // Both a and b are collinear and have the same ray, break ties with squared length
+    Rational a_len2 = dotProduct(a, a);
+    Rational b_len2 = dotProduct(b, b);
+    return a_len2 < b_len2;
+}
+
 Rational orientation(const Point& p, const Point& q, const Point& r) {
     return crossProduct(q - p, r - p);
 }

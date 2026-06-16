@@ -92,6 +92,17 @@ bool Polygon::operator==(const Polygon& other) const {
     return outer_ring == other.outer_ring && inner_rings == other.inner_rings;
 }
 
+std::vector<Segment> toSegments(const std::vector<Polygon>& polygons) {
+    std::vector<Segment> segments;
+    for (const Polygon& polygon : polygons) {
+        for (const LinearRing* ring : polygon.rings()) {
+            std::vector<Segment> ring_segments = ring->segments();
+            segments.insert(segments.end(), ring_segments.begin(), ring_segments.end());
+        }
+    }
+    return segments;
+}
+
 Rectangle::Rectangle(Point lower_left, Point upper_right)
     : lower_left(lower_left), upper_right(upper_right) {}
 
