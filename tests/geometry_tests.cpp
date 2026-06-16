@@ -249,6 +249,41 @@ TEST(DCELTest, ReusesHalfEdgesForPolygonsSharingEdge) {
     EXPECT_EQ(shared_edge_half_edges, 2);
 }
 
+TEST(DCELTest, IgnoresDanglingChainAttachedToSquare) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(1, 0)),
+        Segment(Point(1, 0), Point(1, 1)),
+        Segment(Point(1, 1), Point(0, 1)),
+        Segment(Point(0, 1), Point(0, 0)),
+        Segment(Point(1, 0), Point(2, 0)),
+    };
+
+    const DCEL dcel = DCEL::fromSegments(segments);
+
+    EXPECT_EQ(dcel.pointCount(), 5);
+    EXPECT_EQ(dcel.halfEdgeCount(), 10);
+    EXPECT_EQ(dcel.faceCount(), 2);
+    EXPECT_EQ(dcel.face(DCEL::unbounded_face_index).outer_component, DCEL::npos);
+    ASSERT_EQ(dcel.face(DCEL::unbounded_face_index).inner_components.size(), 1);
+
+    std::size_t bounded_faces = 0;
+    for (std::size_t i = 0; i < dcel.faceCount(); ++i) {
+        if (i == DCEL::unbounded_face_index) {
+            continue;
+        }
+
+        const DCEL::Face& face = dcel.face(i);
+        ++bounded_faces;
+        ASSERT_NE(face.outer_component, DCEL::npos);
+        EXPECT_TRUE(face.inner_components.empty());
+        const std::optional<Polygon> polygon = dcel.polygonOf(face);
+        ASSERT_TRUE(polygon.has_value());
+        EXPECT_DOUBLE_EQ(polygon->area(), 1.0);
+    }
+
+    EXPECT_EQ(bounded_faces, 1);
+}
+
 TEST(DCELTest, HandlesThreeRectanglesTouchingAtPoints) {
     const Polygon lower_left(Rectangle(Point(0, 0), Point(1, 1)).ring());
     const Polygon middle(Rectangle(Point(1, 1), Point(2, 2)).ring());

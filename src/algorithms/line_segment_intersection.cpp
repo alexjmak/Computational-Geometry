@@ -502,8 +502,20 @@ std::vector<SegmentId> handleEventPoint(EventPoint& ls_point, Event& event, Stat
 template <typename IntersectionCallback>
 void forEachLineSegmentIntersection(const std::vector<Segment>& segments,
                                     IntersectionCallback on_intersection) {
+    std::vector<Segment> non_degenerate_segments;
+    std::vector<sweep::SegmentId> original_ids;
+    non_degenerate_segments.reserve(segments.size());
+    original_ids.reserve(segments.size());
+    for (sweep::SegmentId id = 0; id < segments.size(); ++id) {
+        if (segments[id].start == segments[id].end) {
+            continue;
+        }
+        original_ids.push_back(id);
+        non_degenerate_segments.push_back(segments[id]);
+    }
+
     sweep::State ls;
-    ls.populateEventQueue(segments);
+    ls.populateEventQueue(non_degenerate_segments);
 
     while (!ls.event_queue.empty()) {
         auto it = ls.event_queue.begin();
@@ -513,10 +525,15 @@ void forEachLineSegmentIntersection(const std::vector<Segment>& segments,
 
         std::vector<sweep::SegmentId> touching_segments = sweep::handleEventPoint(p, e, ls);
         if (touching_segments.size() > 1) {
+            std::vector<sweep::SegmentId> original_touching_segments;
+            original_touching_segments.reserve(touching_segments.size());
+            for (sweep::SegmentId id : touching_segments) {
+                original_touching_segments.push_back(original_ids[id]);
+            }
 #ifndef NDEBUG
             std::cout << "Intersection at " << p.point.toString() << std::endl;
 #endif
-            on_intersection(p.point, touching_segments);
+            on_intersection(p.point, original_touching_segments);
         }
     }
 }
@@ -524,7 +541,13 @@ void forEachLineSegmentIntersection(const std::vector<Segment>& segments,
 std::unordered_set<Point> bruteForceLineSegmentIntersection(const std::vector<Segment>& segments) {
     std::unordered_set<Point> intersections;
     for (size_t i = 0; i < segments.size(); ++i) {
+        if (segments[i].start == segments[i].end) {
+            continue;
+        }
         for (size_t j = i + 1; j < segments.size(); ++j) {
+            if (segments[j].start == segments[j].end) {
+                continue;
+            }
             std::optional<Point> intersection = intersectionPoint(segments[i], segments[j]);
             if (intersection) {
                 intersections.insert(*intersection);

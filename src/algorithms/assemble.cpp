@@ -1,76 +1,24 @@
 #include "algorithms/assemble.hpp"
 #include "geometry/dcel.hpp"
+#include "geometry/polygon.hpp"
 #include <cassert>
 #include <cstddef>
 #include <optional>
-#include <stdexcept>
-#include <string>
-#include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
 std::vector<LinearRing> assembleRings(const std::vector<Segment>& segments) {
-    std::unordered_map<Point, std::vector<Point>> adjacency_list;
-    std::unordered_set<Segment> seen;
-
-    // Create adjacency list based on the segments
-    for (const Segment& segment : segments) {
-        if (segment.start == segment.end) {
-            throw std::invalid_argument("Degenerate segment with identical endpoints: " +
-                                        segment.toString());
-        }
-
-        Segment canonical_segment = segment.canonicalizedX();
-        if (seen.contains(canonical_segment)) {
-            throw std::invalid_argument("Duplicate segment: " + segment.toString());
-        }
-
-        seen.insert(canonical_segment);
-        adjacency_list[canonical_segment.start].push_back(canonical_segment.end);
-        adjacency_list[canonical_segment.end].push_back(canonical_segment.start);
-    }
-
-    // Validate that every endpoint has degree 2
-    for (const auto& [point, neighbors] : adjacency_list) {
-        if (neighbors.size() != 2) {
-            throw std::invalid_argument("Endpoint with degree != 2: " +
-                                        std::to_string(neighbors.size()) + ": " + point.toString());
-        }
-    }
-
-    // Build rings by walking the adjacency list
+    DCEL dcel = DCEL::fromSegments(segments);
     std::vector<LinearRing> rings;
-    std::unordered_set<Point> visited;
-    for (const auto& [point, neighbors] : adjacency_list) {
-        if (visited.contains(point)) {
+
+    for (std::size_t i = 0; i < dcel.faceCount(); ++i) {
+        const DCEL::Face& face = dcel.face(i);
+        if (face.outer_component == DCEL::npos) {
             continue;
         }
 
-        std::vector<Point> ring_points;
-        const Point start = point;
-        Point prev = start;
-        Point curr = start;
-        do {
-            if (visited.contains(curr)) {
-                throw std::invalid_argument("LinearRing walk reached an already visited point: " +
-                                            curr.toString());
-            }
-
-            visited.insert(curr);
-            ring_points.push_back(curr);
-
-            const std::vector<Point>& neighbors = adjacency_list[curr];
-            const Point& next = neighbors[0] == prev ? neighbors[1] : neighbors[0];
-            prev = curr;
-            curr = next;
-        } while (curr != start);
-
-        LinearRing ring(std::move(ring_points));
-        if (!ring.isOuter()) {
-            ring.reverse();
-        }
-        rings.emplace_back(std::move(ring));
+        const DCEL::HalfEdge& outer_edge = dcel.halfEdge(face.outer_component);
+        rings.push_back(dcel.ringOf(outer_edge));
     }
 
     return rings;

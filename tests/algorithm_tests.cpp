@@ -152,22 +152,50 @@ TEST(AssembleRingsTest, BuildsMultipleDisjointOuterRings) {
     EXPECT_DOUBLE_EQ(rings[0].area() + rings[1].area(), 5.0);
 }
 
-TEST(AssembleRingsTest, RejectsDuplicateReversedAndDegenerateSegments) {
-    EXPECT_THROW(
-        assembleRings({Segment(Point(0, 0), Point(1, 0)), Segment(Point(1, 0), Point(0, 0))}),
-        std::invalid_argument);
+TEST(AssembleRingsTest, AllowsReversedDuplicateSegments) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(1, 0)),
+        Segment(Point(1, 0), Point(1, 1)),
+        Segment(Point(1, 1), Point(0, 1)),
+        Segment(Point(0, 1), Point(0, 0)),
+        Segment(Point(1, 0), Point(0, 0)),
+    };
 
-    EXPECT_THROW(assembleRings({Segment(Point(0, 0), Point(0, 0))}), std::invalid_argument);
+    const std::vector<LinearRing> rings = assembleRings(segments);
+
+    ASSERT_EQ(rings.size(), 1);
+    EXPECT_TRUE(rings[0].isOuter());
+    EXPECT_DOUBLE_EQ(rings[0].area(), 1.0);
+    EXPECT_EQ(pointSet(rings[0].points),
+              pointSet({Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1)}));
 }
 
-TEST(AssembleRingsTest, RejectsOpenChains) {
+TEST(AssembleRingsTest, IgnoresOpenChains) {
     const std::vector<Segment> segments = {
         Segment(Point(0, 0), Point(1, 0)),
         Segment(Point(1, 0), Point(1, 1)),
         Segment(Point(1, 1), Point(0, 1)),
     };
 
-    EXPECT_THROW(assembleRings(segments), std::invalid_argument);
+    EXPECT_TRUE(assembleRings(segments).empty());
+}
+
+TEST(AssembleRingsTest, IgnoresDanglingChainAttachedToRing) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(1, 0)),
+        Segment(Point(1, 0), Point(1, 1)),
+        Segment(Point(1, 1), Point(0, 1)),
+        Segment(Point(0, 1), Point(0, 0)),
+        Segment(Point(1, 0), Point(2, 0)),
+    };
+
+    const std::vector<LinearRing> rings = assembleRings(segments);
+
+    ASSERT_EQ(rings.size(), 1);
+    EXPECT_TRUE(rings[0].isOuter());
+    EXPECT_DOUBLE_EQ(rings[0].area(), 1.0);
+    EXPECT_EQ(pointSet(rings[0].points),
+              pointSet({Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1)}));
 }
 
 TEST(AssemblePolygonsTest, BuildsDonutWithIsland) {
@@ -296,6 +324,16 @@ TEST(LineSegmentIntersectionTest, KeepsReversedDuplicateSegmentsDistinctInternal
     };
 
     expectIntersections(segments, {Point(0, 0), Point(4, 0)});
+}
+
+TEST(LineSegmentIntersectionTest, IgnoresDegenerateSegments) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(0, 0)),
+        Segment(Point(0, 0), Point(4, 4)),
+        Segment(Point(0, 4), Point(4, 0)),
+    };
+
+    expectIntersections(segments, {Point(2, 2)});
 }
 
 TEST(PlanarizeSegmentsTest, SplitsCrossingSegmentsAtIntersection) {
