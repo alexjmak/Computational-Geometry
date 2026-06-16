@@ -180,7 +180,7 @@ add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/cgeom.pyi
     COMMAND ${CMAKE_COMMAND} -E env
             PYTHONPATH=$<TARGET_FILE_DIR:cgeom_python>
-            pybind11-stubgen
+            ${Python3_EXECUTABLE} -m pybind11_stubgen
             cgeom
             -o ${CMAKE_CURRENT_BINARY_DIR}
     DEPENDS cgeom_python
