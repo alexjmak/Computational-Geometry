@@ -128,4 +128,31 @@ class Rectangle {
     double area() const;
 };
 
+/// \brief Classification of a point relative to a ring or polygon.
+enum class PointContainment {
+    Inside,   ///< The point lies in the interior.
+    Boundary, ///< The point lies exactly on a boundary segment.
+    Outside,  ///< The point lies outside the enclosed area.
+};
+
+/// \brief Locate a point relative to a linear ring using the odd-even rule.
+/// \param ring The ring whose boundary and interior should be tested.
+/// \param point The point to classify.
+/// \returns Inside, Boundary, or Outside relative to the ring.
+PointContainment locatePoint(const LinearRing& ring, const Point& point);
+
+/// \brief Locate a point relative to a polygon with holes.
+/// \param polygon The polygon whose boundary and interior should be tested.
+/// \param point The point to classify.
+/// \returns Inside if the point is inside the outer ring and outside all holes, Boundary if it
+/// lies on any polygon boundary, otherwise Outside.
+PointContainment locatePoint(const Polygon& polygon, const Point& point);
+
+/// \brief Check whether a polygon contains a point.
+/// \param polygon The polygon to test.
+/// \param point The point to test.
+/// \param include_boundary Whether points on polygon boundaries should count as contained.
+/// \returns True if the point is contained according to include_boundary, otherwise false.
+bool pointInPolygon(const Polygon& polygon, const Point& point, bool include_boundary = false);
+
 #endif // POLYGON_HPP

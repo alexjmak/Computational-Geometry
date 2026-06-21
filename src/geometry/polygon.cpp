@@ -1,4 +1,5 @@
 #include "geometry/polygon.hpp"
+#include "geometry/intersection.hpp"
 #include "geometry/predicates.hpp"
 #include <cmath>
 #include <stdexcept>
@@ -145,4 +146,60 @@ double Rectangle::area() const {
     Rational width = upper_right.x - lower_left.x;
     Rational height = upper_right.y - lower_left.y;
     return boost::rational_cast<double>(width * height);
+}
+
+PointContainment locatePoint(const LinearRing& ring, const Point& point) {
+    bool inside = false;
+
+    for (const Segment& segment : ring.segments()) {
+        if (isPointOnSegment(point, segment)) {
+            return PointContainment::Boundary;
+        }
+
+        // Don't count horizontal edges which have infinite intersection points
+        bool crosses = segment.start.y > point.y != segment.end.y > point.y;
+        if (crosses && rightRayIntersection(segment, point)) {
+            // Odd-even fill rule
+            inside = !inside;
+        }
+    }
+
+    if (inside) {
+        return PointContainment::Inside;
+    }
+
+    return PointContainment::Outside;
+}
+
+PointContainment locatePoint(const Polygon& polygon, const Point& point) {
+    PointContainment outer_point_containment = locatePoint(polygon.outer_ring, point);
+    if (outer_point_containment != PointContainment::Inside) {
+        return outer_point_containment;
+    }
+
+    for (const LinearRing& inner_ring : polygon.inner_rings) {
+        PointContainment inner_point_containment = locatePoint(inner_ring, point);
+        if (inner_point_containment == PointContainment::Boundary) {
+            return PointContainment::Boundary;
+        }
+
+        if (inner_point_containment == PointContainment::Inside) {
+            return PointContainment::Outside;
+        }
+    }
+
+    return PointContainment::Inside;
+}
+
+bool pointInPolygon(const Polygon& polygon, const Point& point, bool include_boundary) {
+    PointContainment point_containment = locatePoint(polygon, point);
+    if (point_containment == PointContainment::Inside) {
+        return true;
+    }
+
+    if (include_boundary && point_containment == PointContainment::Boundary) {
+        return true;
+    }
+
+    return false;
 }

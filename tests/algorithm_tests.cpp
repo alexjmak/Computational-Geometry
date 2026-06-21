@@ -82,6 +82,79 @@ std::vector<Segment> rectangleSegments(const Point& lower_left, const Point& upp
     };
 }
 
+std::vector<Segment> rectangleHoleSegments(const Point& lower_left, const Point& upper_right) {
+    const Point lower_right(upper_right.x, lower_left.y);
+    const Point upper_left(lower_left.x, upper_right.y);
+    return {
+        Segment(lower_left, upper_left),
+        Segment(upper_left, upper_right),
+        Segment(upper_right, lower_right),
+        Segment(lower_right, lower_left),
+    };
+}
+
+Segment segment(long long ax, long long ay, long long bx, long long by) {
+    return Segment(Point(ax, ay), Point(bx, by));
+}
+
+struct OverlayBucketCounts {
+    std::size_t left_only = 0;
+    std::size_t right_only = 0;
+    std::size_t both = 0;
+    std::size_t neither = 0;
+    double left_only_area = 0.0;
+    double right_only_area = 0.0;
+    double both_area = 0.0;
+};
+
+OverlayBucketCounts countOverlayBuckets(const OverlayResult& overlay) {
+    OverlayBucketCounts counts;
+    for (const OverlayFacePolygon& face : overlayFacePolygons(overlay)) {
+        const bool in_left = face.label.left_face != DCEL::unbounded_face_index;
+        const bool in_right = face.label.right_face != DCEL::unbounded_face_index;
+        const double area = face.polygon.area();
+
+        EXPECT_GT(area, 0.0);
+        if (in_left && in_right) {
+            ++counts.both;
+            counts.both_area += area;
+        } else if (in_left) {
+            ++counts.left_only;
+            counts.left_only_area += area;
+        } else if (in_right) {
+            ++counts.right_only;
+            counts.right_only_area += area;
+        } else {
+            ++counts.neither;
+        }
+    }
+    return counts;
+}
+
+std::vector<Segment> showcaseSolidLayer() {
+    return {
+        segment(20, 72, 82, 71), segment(82, 71, 92, 46),
+        segment(92, 46, 74, 21), segment(74, 21, 26, 28),
+        segment(26, 28, 13, 57), segment(13, 57, 20, 72),
+        segment(20, 72, 35, 62), segment(35, 62, 60, 60),
+        segment(60, 60, 82, 71), segment(35, 62, 40, 38),
+        segment(40, 38, 64, 45), segment(60, 60, 64, 45),
+        segment(64, 45, 82, 48), segment(74, 21, 82, 48),
+        segment(26, 28, 40, 38),
+    };
+}
+
+std::vector<Segment> showcaseDottedLayer() {
+    return {
+        segment(3, 70, 42, 86), segment(42, 86, 74, 58),
+        segment(74, 58, 70, 43), segment(70, 43, 28, 9),
+        segment(28, 9, 3, 35),   segment(3, 35, 3, 70),
+        segment(9, 60, 38, 65),  segment(38, 65, 52, 53),
+        segment(52, 53, 47, 44), segment(47, 44, 11, 44),
+        segment(11, 44, 9, 60),
+    };
+}
+
 } // namespace
 
 TEST(ConvexHullTest, BuildsSquareAroundInteriorPoint) {
@@ -154,10 +227,8 @@ TEST(AssembleRingsTest, BuildsMultipleDisjointOuterRings) {
 
 TEST(AssembleRingsTest, AllowsReversedDuplicateSegments) {
     const std::vector<Segment> segments = {
-        Segment(Point(0, 0), Point(1, 0)),
-        Segment(Point(1, 0), Point(1, 1)),
-        Segment(Point(1, 1), Point(0, 1)),
-        Segment(Point(0, 1), Point(0, 0)),
+        Segment(Point(0, 0), Point(1, 0)), Segment(Point(1, 0), Point(1, 1)),
+        Segment(Point(1, 1), Point(0, 1)), Segment(Point(0, 1), Point(0, 0)),
         Segment(Point(1, 0), Point(0, 0)),
     };
 
@@ -182,10 +253,8 @@ TEST(AssembleRingsTest, IgnoresOpenChains) {
 
 TEST(AssembleRingsTest, IgnoresDanglingChainAttachedToRing) {
     const std::vector<Segment> segments = {
-        Segment(Point(0, 0), Point(1, 0)),
-        Segment(Point(1, 0), Point(1, 1)),
-        Segment(Point(1, 1), Point(0, 1)),
-        Segment(Point(0, 1), Point(0, 0)),
+        Segment(Point(0, 0), Point(1, 0)), Segment(Point(1, 0), Point(1, 1)),
+        Segment(Point(1, 1), Point(0, 1)), Segment(Point(0, 1), Point(0, 0)),
         Segment(Point(1, 0), Point(2, 0)),
     };
 
@@ -351,4 +420,52 @@ TEST(PlanarizeSegmentsTest, SplitsCrossingSegmentsAtIntersection) {
                                Segment(Point(0, 4), Point(2, 2)),
                                Segment(Point(2, 2), Point(4, 0)),
                            }));
+}
+
+TEST(SegmentOverlayTest, LabelsContainedPolygonShowcaseFaces) {
+    const std::vector<Segment> layer1 = rectangleSegments(Point(3, 2), Point(7, 5));
+    const std::vector<Segment> layer2 = rectangleSegments(Point(0, 0), Point(10, 8));
+
+    const OverlayResult overlay = segmentOverlay(layer1, layer2);
+    const OverlayBucketCounts counts = countOverlayBuckets(overlay);
+
+    EXPECT_EQ(counts.left_only, 0);
+    EXPECT_EQ(counts.right_only, 1);
+    EXPECT_EQ(counts.both, 1);
+    EXPECT_EQ(counts.neither, 0);
+    EXPECT_DOUBLE_EQ(counts.right_only_area, 68.0);
+    EXPECT_DOUBLE_EQ(counts.both_area, 12.0);
+}
+
+TEST(SegmentOverlayTest, LabelsOverlayShowcaseFaces) {
+    const OverlayResult overlay = segmentOverlay(showcaseSolidLayer(), showcaseDottedLayer());
+    const OverlayBucketCounts counts = countOverlayBuckets(overlay);
+
+    EXPECT_EQ(counts.left_only, 3);
+    EXPECT_EQ(counts.right_only, 2);
+    EXPECT_EQ(counts.both, 9);
+    EXPECT_EQ(counts.neither, 0);
+}
+
+TEST(PolygonAndTest, BuildsIntersectionOfTwoDonuts) {
+    std::vector<Segment> layer1 = rectangleSegments(Point(1, 1), Point(7, 6));
+    const std::vector<Segment> layer1_hole =
+        rectangleHoleSegments(Point(Rational(11, 2), Rational(9, 2)),
+                              Point(Rational(13, 2), Rational(11, 2)));
+    layer1.insert(layer1.end(), layer1_hole.begin(), layer1_hole.end());
+
+    std::vector<Segment> layer2 = rectangleSegments(Point(4, 3), Point(10, 8));
+    const std::vector<Segment> layer2_hole =
+        rectangleHoleSegments(Point(5, 4), Point(6, 5));
+    layer2.insert(layer2.end(), layer2_hole.begin(), layer2_hole.end());
+
+    const std::vector<Segment> intersection_segments = polygon_and(layer1, layer2);
+    const std::vector<Polygon> polygons = assemblePolygons(intersection_segments);
+
+    EXPECT_EQ(intersection_segments.size(), 12);
+    ASSERT_EQ(polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(polygons[0].area(), 7.25);
+    EXPECT_DOUBLE_EQ(polygons[0].outer_ring.area(), 9.0);
+    ASSERT_EQ(polygons[0].inner_rings.size(), 1);
+    EXPECT_DOUBLE_EQ(polygons[0].inner_rings[0].area(), 1.75);
 }

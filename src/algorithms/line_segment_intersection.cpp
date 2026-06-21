@@ -551,7 +551,7 @@ std::unordered_set<Point> bruteForceLineSegmentIntersection(const std::vector<Se
             std::optional<Point> intersection = intersectionPoint(segments[i], segments[j]);
             if (intersection) {
                 intersections.insert(*intersection);
-            } else if (intersectionType(segments[i], segments[j]) == IntersectionType::SEGMENT) {
+            } else if (intersectionType(segments[i], segments[j]) == IntersectionType::Segment) {
                 // To make it consistent with the sweep-line output, we include endpoints of
                 // collinear overlaps.
                 if (isPointOnSegment(segments[i].start, segments[j])) {

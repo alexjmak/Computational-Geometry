@@ -14,30 +14,30 @@ IntersectionType intersectionType(const Segment& s, const Segment& t) {
         Segment s2 = s.canonicalizedX();
         Segment t2 = t.canonicalizedX();
         if (s2.end > t2.start && s2.start < t2.end) {
-            return IntersectionType::SEGMENT;
+            return IntersectionType::Segment;
         }
     }
 
     // X intersection.
     if (o1 * o2 < 0 && o3 * o4 < 0) {
-        return IntersectionType::POINT;
+        return IntersectionType::Point;
     }
 
     // T intersection.
     if (o1 == 0 && isPointOnSegment(t.start, s))
-        return IntersectionType::POINT;
+        return IntersectionType::Point;
     if (o2 == 0 && isPointOnSegment(t.end, s))
-        return IntersectionType::POINT;
+        return IntersectionType::Point;
     if (o3 == 0 && isPointOnSegment(s.start, t))
-        return IntersectionType::POINT;
+        return IntersectionType::Point;
     if (o4 == 0 && isPointOnSegment(s.end, t))
-        return IntersectionType::POINT;
+        return IntersectionType::Point;
 
-    return IntersectionType::NONE;
+    return IntersectionType::None;
 }
 
 std::optional<Point> intersectionPoint(const Segment& s, const Segment& t) {
-    if (intersectionType(s, t) != IntersectionType::POINT) {
+    if (intersectionType(s, t) != IntersectionType::Point) {
         return std::nullopt;
     }
 
@@ -89,6 +89,19 @@ std::optional<Point> leftRayIntersection(const Segment& segment, const Point& or
     }
 
     if (intersection->x >= origin.x) {
+        return std::nullopt;
+    }
+
+    return intersection;
+}
+
+std::optional<Point> rightRayIntersection(const Segment& segment, const Point& origin) {
+    std::optional<Point> intersection = intersectAtY(segment, origin);
+    if (!intersection) {
+        return std::nullopt;
+    }
+
+    if (intersection->x <= origin.x) {
         return std::nullopt;
     }
 

@@ -63,16 +63,16 @@ TEST(PredicateTest, DetectsPointsOnSegments) {
 TEST(IntersectionTest, ClassifiesDisjointCrossingTouchingAndOverlap) {
     EXPECT_EQ(
         intersectionType(Segment(Point(0, 0), Point(1, 0)), Segment(Point(0, 1), Point(1, 1))),
-        IntersectionType::NONE);
+        IntersectionType::None);
     EXPECT_EQ(
         intersectionType(Segment(Point(0, 0), Point(4, 4)), Segment(Point(0, 4), Point(4, 0))),
-        IntersectionType::POINT);
+        IntersectionType::Point);
     EXPECT_EQ(
         intersectionType(Segment(Point(0, 0), Point(4, 0)), Segment(Point(4, 0), Point(5, 1))),
-        IntersectionType::POINT);
+        IntersectionType::Point);
     EXPECT_EQ(
         intersectionType(Segment(Point(0, 0), Point(4, 0)), Segment(Point(2, 0), Point(6, 0))),
-        IntersectionType::SEGMENT);
+        IntersectionType::Segment);
 }
 
 TEST(IntersectionTest, ComputesUniqueIntersectionPoints) {
@@ -108,6 +108,31 @@ TEST(LinearRingTest, ComputesSignedAreaOrientationAndSegments) {
                    Segment(Point(2, 0), Point(2, 2)), Segment(Point(2, 2), Point(0, 2))}));
 }
 
+TEST(LinearRingTest, LocatesPointsInsideOnBoundaryAndOutside) {
+    const LinearRing ring({Point(0, 0), Point(4, 0), Point(4, 4), Point(0, 4)});
+
+    EXPECT_EQ(locatePoint(ring, Point(2, 2)), PointContainment::Inside);
+    EXPECT_EQ(locatePoint(ring, Point(4, 2)), PointContainment::Boundary);
+    EXPECT_EQ(locatePoint(ring, Point(2, 4)), PointContainment::Boundary);
+    EXPECT_EQ(locatePoint(ring, Point(5, 2)), PointContainment::Outside);
+}
+
+TEST(LinearRingTest, LocatesPointsInConcaveRing) {
+    const LinearRing ring({
+        Point(0, 0),
+        Point(4, 0),
+        Point(4, 1),
+        Point(1, 1),
+        Point(1, 4),
+        Point(0, 4),
+    });
+
+    EXPECT_EQ(locatePoint(ring, Point(Rational(1, 2), Rational(1, 2))),
+              PointContainment::Inside);
+    EXPECT_EQ(locatePoint(ring, Point(2, 2)), PointContainment::Outside);
+    EXPECT_EQ(locatePoint(ring, Point(1, 2)), PointContainment::Boundary);
+}
+
 TEST(PolygonTest, ValidatesRingOrientations) {
     const LinearRing outer({Point(0, 0), Point(4, 0), Point(4, 4), Point(0, 4)});
     const LinearRing hole({Point(1, 1), Point(1, 2), Point(2, 2), Point(2, 1)});
@@ -129,6 +154,22 @@ TEST(PolygonTest, ReturnsOuterThenInnerRings) {
     ASSERT_EQ(rings.size(), 2);
     EXPECT_EQ(*rings[0], outer);
     EXPECT_EQ(*rings[1], hole);
+}
+
+TEST(PolygonTest, LocatesPointsWithHole) {
+    const LinearRing outer({Point(0, 0), Point(5, 0), Point(5, 5), Point(0, 5)});
+    const LinearRing hole({Point(1, 1), Point(1, 4), Point(4, 4), Point(4, 1)});
+    const Polygon polygon(outer, {hole});
+
+    EXPECT_EQ(locatePoint(polygon, Point(Rational(1, 2), Rational(1, 2))),
+              PointContainment::Inside);
+    EXPECT_EQ(locatePoint(polygon, Point(2, 2)), PointContainment::Outside);
+    EXPECT_EQ(locatePoint(polygon, Point(1, 2)), PointContainment::Boundary);
+    EXPECT_EQ(locatePoint(polygon, Point(6, 2)), PointContainment::Outside);
+
+    EXPECT_TRUE(pointInPolygon(polygon, Point(Rational(1, 2), Rational(1, 2))));
+    EXPECT_FALSE(pointInPolygon(polygon, Point(1, 2)));
+    EXPECT_TRUE(pointInPolygon(polygon, Point(1, 2), true));
 }
 
 TEST(RandomTest, SeededGenerationIsDeterministic) {
@@ -251,10 +292,8 @@ TEST(DCELTest, ReusesHalfEdgesForPolygonsSharingEdge) {
 
 TEST(DCELTest, IgnoresDanglingChainAttachedToSquare) {
     const std::vector<Segment> segments = {
-        Segment(Point(0, 0), Point(1, 0)),
-        Segment(Point(1, 0), Point(1, 1)),
-        Segment(Point(1, 1), Point(0, 1)),
-        Segment(Point(0, 1), Point(0, 0)),
+        Segment(Point(0, 0), Point(1, 0)), Segment(Point(1, 0), Point(1, 1)),
+        Segment(Point(1, 1), Point(0, 1)), Segment(Point(0, 1), Point(0, 0)),
         Segment(Point(1, 0), Point(2, 0)),
     };
 

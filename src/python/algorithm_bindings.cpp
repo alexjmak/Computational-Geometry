@@ -55,6 +55,19 @@ std::vector<Segment> randomSegmentsPython(int count, std::optional<unsigned int>
 } // namespace
 
 void bindAlgorithms(py::module_& module) {
+    py::class_<OverlayFaceLabel>(module, "OverlayFaceLabel")
+        .def_readonly("left_face", &OverlayFaceLabel::left_face)
+        .def_readonly("right_face", &OverlayFaceLabel::right_face);
+
+    py::class_<OverlayFacePolygon>(module, "OverlayFacePolygon")
+        .def_readonly("face_index", &OverlayFacePolygon::face_index)
+        .def_readonly("polygon", &OverlayFacePolygon::polygon)
+        .def_readonly("label", &OverlayFacePolygon::label);
+
+    py::class_<OverlayResult>(module, "OverlayResult")
+        .def_readonly("face_labels", &OverlayResult::faceLabels)
+        .def("polygons", &overlayFacePolygons);
+
     module.def("assemble_rings", &assembleRings, py::arg("segments"));
     module.def("assemble_polygons", &assemblePolygons, py::arg("segments"));
     module.def("convex_hull", &convexHull, py::arg("points"));
@@ -68,4 +81,9 @@ void bindAlgorithms(py::module_& module) {
     module.def("planarize_segments",
                py::overload_cast<const std::vector<Segment>&>(&planarizeSegments),
                py::arg("segments"));
+    module.def("segment_overlay",
+               py::overload_cast<const std::vector<Segment>&, const std::vector<Segment>&>(
+                   &segmentOverlay),
+               py::arg("left"), py::arg("right"));
+    module.def("polygon_and", &polygon_and, py::arg("left"), py::arg("right"));
 }
