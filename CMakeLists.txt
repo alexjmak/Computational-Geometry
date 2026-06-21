@@ -5,7 +5,6 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(ENABLE_CLANG_TIDY "Run clang-tidy during builds" ON)
-add_compile_options(-fcolor-diagnostics)
 
 include(FetchContent)
 include(CTest)
