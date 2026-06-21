@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(ENABLE_CLANG_TIDY "Run clang-tidy during builds" ON)
+add_compile_options(-fcolor-diagnostics)
 
 include(FetchContent)
 include(CTest)
@@ -49,7 +50,7 @@ if(ENABLE_CLANG_TIDY)
     find_program(CLANG_TIDY_EXE clang-tidy
         PATHS /usr/local/opt/llvm/bin
     )
-    set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_EXE})
+    set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_EXE} --use-color)
 
     if(APPLE)
         list(APPEND CMAKE_CXX_CLANG_TIDY --extra-arg=-isystem${Boost_INCLUDE_DIRS})
