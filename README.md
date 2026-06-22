@@ -2,9 +2,10 @@
 
 [![CI](https://github.com/alexjmak/Computational-Geometry/actions/workflows/ci.yml/badge.svg)](https://github.com/alexjmak/Computational-Geometry/actions/workflows/ci.yml)
 
-A C++23 computational geometry toolkit with a reusable core library, command-line
-tools, a Qt GUI, pybind11 Python bindings, YAML geometry I/O, GoogleTest tests,
-and optional Doxygen documentation.
+A C++23 computational geometry toolkit with a reusable core library, DCEL-based
+arrangement utilities, polygon boolean operations, a Qt viewer, pybind11 Python
+bindings, YAML geometry I/O, GoogleTest tests, and optional Doxygen
+documentation.
 
 ## Features
 
@@ -12,6 +13,11 @@ and optional Doxygen documentation.
   and DCEL structures.
 - Convex hull construction.
 - Line segment intersection with both line-sweep and brute-force algorithms.
+- Segment planarization and DCEL construction from planar segment graphs.
+- Segment overlay with face labels for the left and right input subdivisions.
+- Polygon boolean operations: intersection, union, difference, and symmetric
+  difference.
+- Ring and polygon assembly from segment boundaries.
 - YAML document format organized into named geometry layers.
 - Random point and segment generation for repeatable examples and tests.
 - Qt-based visualization executable, `cgeom-gui`.
@@ -35,6 +41,7 @@ sudo apt-get update
 sudo apt-get install -y \
   cmake \
   clang-tidy \
+  doxygen \
   g++ \
   libboost-all-dev \
   libqt6charts6-dev \
@@ -64,7 +71,6 @@ cmake --build build
 
 The build produces:
 
-- `cgeom`, the CLI executable
 - `cgeom-gui`, the Qt GUI executable
 - `cgeom`, the Python extension module in the build directory
 - GoogleTest binaries under the build tree
@@ -81,34 +87,6 @@ The `QT_QPA_PLATFORM=offscreen` environment variable lets GUI tests run in a
 headless environment.
 
 CI runs Debug and Release builds on Ubuntu and executes the CTest suite.
-
-## CLI Examples
-
-Generate deterministic random segments:
-
-```bash
-./build-debug/cgeom random segments random.yaml -count 100 -seed 0
-```
-
-Find segment intersections with the line-sweep algorithm:
-
-```bash
-./build-debug/cgeom intersection random.yaml output.yaml -algorithm line-sweep
-```
-
-Compute a convex hull from the geometry in a document:
-
-```bash
-./build-debug/cgeom convex_hull random.yaml hull.yaml
-```
-
-Compare generated YAML documents:
-
-```bash
-./build-debug/cgeom compare output.yaml output.yaml
-```
-
-Other CLI subcommands include `filter` and `script`.
 
 ## Python Example
 
@@ -132,6 +110,50 @@ cg.save_yaml(output_document, "output.yaml")
 
 print(f"Found {len(intersections)} intersections")
 PY
+```
+
+Polygon boolean operations return boundary segments. Feed those segments into
+`assemble_polygons` to recover polygon objects:
+
+```bash
+PYTHONPATH=build-debug python3 - <<'PY'
+import cgeom as cg
+
+left = cg.Rectangle(cg.Point(0, 0), cg.Point(5, 5)).ring().segments()
+right = cg.Rectangle(cg.Point(3, 2), cg.Point(8, 6)).ring().segments()
+
+intersection_segments = cg.polygon_and(left, right)
+intersection_polygons = cg.assemble_polygons(intersection_segments)
+
+print(f"Intersection polygons: {len(intersection_polygons)}")
+print(f"Intersection area: {sum(p.area() for p in intersection_polygons)}")
+PY
+```
+
+Other exposed algorithms include `convex_hull`, `assemble_rings`,
+`assemble_polygons`, `planarize_segments`, `segment_overlay`, `polygon_or`,
+`polygon_difference`, and `polygon_xor`.
+
+## Showcase Scripts
+
+The `scripts/` directory contains small Python examples that generate YAML
+documents and plots:
+
+- `showcase_geometry_primitives.py`
+- `showcase_segment_intersections.py`
+- `showcase_convex_hull.py`
+- `showcase_assemble_rings.py`
+- `showcase_assemble_polygons.py`
+- `showcase_overlay.py`
+- `showcase_polygon_and.py`
+- `showcase_polygon_or.py`
+- `showcase_polygon_difference.py`
+- `showcase_polygon_xor.py`
+
+Run one with the build directory on `PYTHONPATH`:
+
+```bash
+PYTHONPATH=build-debug python3 scripts/showcase_polygon_and.py
 ```
 
 ## YAML Format
@@ -186,9 +208,9 @@ Generated documentation is written under `docs/`, which is ignored by Git.
 ## Project Layout
 
 - `src/geometry`: core primitives and predicates
-- `src/algorithms`: convex hull and line segment intersection algorithms
+- `src/algorithms`: convex hull, segment intersection, assembly, overlay, and
+  polygon boolean algorithms
 - `src/io`: YAML document model and serialization
-- `src/cli`: command-line parser and operations
 - `src/gui`: Qt visualization components
 - `src/python`: pybind11 bindings for the C++ library
 - `tests`: GoogleTest suites and a Python binding example

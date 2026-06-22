@@ -131,19 +131,6 @@ set_target_properties(
 )
 
 add_executable(
-    cgeom
-    src/cli/main.cpp
-    src/cli/arg_parser.cpp
-    src/cli/operations.cpp
-)
-
-target_link_libraries(
-    cgeom
-    PRIVATE
-    geometry_core
-)
-
-add_executable(
     cgeom-gui
     src/gui/main.cpp
 )
