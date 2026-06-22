@@ -12,6 +12,7 @@ include(CTest)
 find_package(Boost CONFIG REQUIRED)
 find_package(Qt6 REQUIRED COMPONENTS Widgets Charts Concurrent)
 find_package(Doxygen)
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Module)
 
 set(PYBIND11_FINDPYTHON ON CACHE BOOL "" FORCE)
 
@@ -171,11 +172,8 @@ set_target_properties(
 target_link_libraries(
     cgeom_python
     PRIVATE
-    geometry_core
     gui_core
 )
-
-find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/cgeom.pyi
