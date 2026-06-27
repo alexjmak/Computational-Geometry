@@ -90,6 +90,15 @@ struct DCELBuilderRing {
     std::vector<std::size_t> half_edges; ///< Ordered half-edge indices around the ring.
 };
 
+DCEL::FaceParity oppositeFaceParity(DCEL::FaceParity parity) {
+    assert(parity != DCEL::FaceParity::Unknown);
+
+    if (parity == DCEL::FaceParity::Exterior) {
+        return DCEL::FaceParity::Interior;
+    }
+    return DCEL::FaceParity::Exterior;
+}
+
 } // namespace
 
 /// \brief Incremental builder for constructing a DCEL from polygon boundaries.
@@ -688,11 +697,12 @@ const DCEL::Face& DCEL::unboundedFace() const {
     return faces[unbounded_face_index];
 }
 
-std::vector<std::size_t> DCEL::faceDepths() const {
-    std::size_t depth = 0;
-    std::vector<std::size_t> face_depths(faces.size(), DCEL::npos);
-    face_depths[unbounded_face_index] = depth;
+std::vector<DCEL::FaceParity> DCEL::faceParities() const {
+    std::vector<FaceParity> face_parities(faces.size(), FaceParity::Unknown);
+    face_parities[unbounded_face_index] = FaceParity::Exterior;
 
+    // Traverse the face-adjacency graph from the unbounded face using BFS.
+    // Crossing a boundary through a half-edge twin flips the fill parity.
     std::queue<std::size_t> queue;
     queue.push(unbounded_face_index);
 
@@ -703,22 +713,35 @@ std::vector<std::size_t> DCEL::faceDepths() const {
             queue.pop();
 
             const Face& face = faces[face_index];
-            for (std::size_t inner_component : face.inner_components) {
-                const HalfEdge& half_edge = half_edges[inner_component];
-                const HalfEdge& twin_half_edge = twinOf(half_edge);
-                const std::size_t next_face = twin_half_edge.face;
-                assert(next_face != npos);
+            const FaceParity adjacent_parity = oppositeFaceParity(face_parities[face_index]);
 
-                if (face_depths[next_face] != npos) {
-                    continue;
-                }
+            auto visit_boundary_component = [&](std::size_t component) {
+                std::size_t curr_half_edge = component;
+                do {
+                    const HalfEdge& half_edge = half_edges[curr_half_edge];
+                    const HalfEdge& twin_half_edge = twinOf(half_edge);
+                    const std::size_t adjacent_face = twin_half_edge.face;
+                    assert(adjacent_face != npos);
 
-                face_depths[next_face] = depth + 1;
-                queue.push(next_face);
+                    if (face_parities[adjacent_face] == FaceParity::Unknown) {
+                        face_parities[adjacent_face] = adjacent_parity;
+                        queue.push(adjacent_face);
+                    } else {
+                        assert(face_parities[adjacent_face] == adjacent_parity);
+                    }
+
+                    curr_half_edge = half_edge.next;
+                } while (curr_half_edge != component);
+            };
+
+            if (face.outer_component != DCEL::npos) {
+                visit_boundary_component(face.outer_component);
+            }
+            for (std::size_t component : face.inner_components) {
+                visit_boundary_component(component);
             }
         }
-        ++depth;
     }
 
-    return face_depths;
+    return face_parities;
 }

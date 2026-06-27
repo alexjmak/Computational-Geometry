@@ -64,6 +64,13 @@ class DCEL {
         std::vector<std::size_t> inner_components; ///< Half-edges on hole boundaries.
     };
 
+    /// \brief Odd-even fill classification for a DCEL face.
+    enum class FaceParity {
+        Unknown,  ///< Face has not been reached during parity traversal.
+        Exterior, ///< Face is outside the filled region under odd-even parity.
+        Interior, ///< Face is inside the filled region under odd-even parity.
+    };
+
     /// \brief Return the number of vertices in the DCEL.
     /// \returns The number of stored DCEL points.
     std::size_t pointCount() const;
@@ -136,9 +143,9 @@ class DCEL {
     /// \returns The face at DCEL::unbounded_face_index.
     const Face& unboundedFace() const;
 
-    /// \brief Compute nesting depths for all faces using the unbounded face as depth zero.
-    /// \returns A face-indexed depth vector; unreachable faces keep DCEL::npos.
-    std::vector<std::size_t> faceDepths() const;
+    /// \brief Compute odd-even fill parity for all faces using the unbounded face as exterior.
+    /// \returns A face-indexed parity vector; unreachable faces keep FaceParity::Unknown.
+    std::vector<FaceParity> faceParities() const;
 
     /// \brief Build a DCEL from segments.
     /// \param segments The segments to populate the DCEL.

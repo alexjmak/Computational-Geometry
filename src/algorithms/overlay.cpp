@@ -249,20 +249,21 @@ std::vector<Segment> polygon_and(const std::vector<Segment>& left,
     OverlayResult overlay = segmentOverlay(left_dcel, right_dcel);
 
     const DCEL& dcel = overlay.dcel;
-    const std::vector<std::size_t> left_face_depths = left_dcel.faceDepths();
-    const std::vector<std::size_t> right_face_depths = right_dcel.faceDepths();
+    const std::vector<DCEL::FaceParity> left_face_parities = left_dcel.faceParities();
+    const std::vector<DCEL::FaceParity> right_face_parities = right_dcel.faceParities();
     std::vector<bool> selected_faces(dcel.faceCount(), false);
 
-    auto is_filled_face = [](const std::vector<std::size_t>& face_depths, std::size_t face_index) {
-        return face_index < face_depths.size() && face_depths[face_index] != DCEL::npos &&
-               face_depths[face_index] % 2 == 1;
+    auto is_filled_face = [](const std::vector<DCEL::FaceParity>& face_parities,
+                             std::size_t face_index) {
+        return face_index < face_parities.size() &&
+               face_parities[face_index] == DCEL::FaceParity::Interior;
     };
 
     assert(overlay.faceLabels.size() == dcel.faceCount());
     for (std::size_t i = 0; i < dcel.faceCount(); ++i) {
         const OverlayFaceLabel& faceLabel = overlay.faceLabels[i];
-        selected_faces[i] = is_filled_face(left_face_depths, faceLabel.left_face) &&
-                            is_filled_face(right_face_depths, faceLabel.right_face);
+        selected_faces[i] = is_filled_face(left_face_parities, faceLabel.left_face) &&
+                            is_filled_face(right_face_parities, faceLabel.right_face);
     }
 
     std::vector<Segment> segments;

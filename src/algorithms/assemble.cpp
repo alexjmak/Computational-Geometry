@@ -26,17 +26,16 @@ std::vector<LinearRing> assembleRings(const std::vector<Segment>& segments) {
 
 std::vector<Polygon> assemblePolygons(const std::vector<Segment>& segments) {
     DCEL dcel = DCEL::fromSegments(segments);
-    const std::vector<std::size_t> face_depths = dcel.faceDepths();
+    const std::vector<DCEL::FaceParity> face_parities = dcel.faceParities();
     std::vector<Polygon> polygons;
 
-    // Face depth counts how many boundary rings separate a face from the unbounded face.
-    // By the odd-even fill rule, odd-depth faces are filled polygon interiors, while
-    // even-depth faces are exterior/hole regions.
+    // By the odd-even fill rule, interior faces are filled polygon regions, while exterior
+    // faces are unfilled background or holes.
     for (std::size_t i = 0; i < dcel.faceCount(); ++i) {
-        const std::size_t depth = face_depths[i];
-        assert(depth != DCEL::npos);
+        const DCEL::FaceParity parity = face_parities[i];
+        assert(parity != DCEL::FaceParity::Unknown);
 
-        if (depth % 2 == 1) {
+        if (parity == DCEL::FaceParity::Interior) {
             const DCEL::Face& face = dcel.face(i);
             assert(face.outer_component != DCEL::npos);
             std::optional<Polygon> polygon = dcel.polygonOf(face);
