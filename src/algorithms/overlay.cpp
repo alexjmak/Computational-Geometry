@@ -12,6 +12,13 @@
 
 namespace {
 
+enum class PolygonBooleanOp {
+    And,
+    Or,
+    Difference,
+    Xor,
+};
+
 std::optional<Point> nearestLeftBoundaryIntersection(const Polygon& polygon, const Point& origin) {
     std::optional<Point> nearest_left;
     for (const LinearRing* ring : polygon.rings()) {
@@ -52,6 +59,64 @@ Point representativePointInsideFace(const Polygon& polygon) {
     }
 
     throw std::logic_error("Unable to choose representative point inside overlay face");
+}
+
+bool isFilledFace(const std::vector<DCEL::FaceParity>& face_parities, std::size_t face_index) {
+    return face_index < face_parities.size() &&
+           face_parities[face_index] == DCEL::FaceParity::Interior;
+}
+
+bool selectFace(PolygonBooleanOp op, bool left_inside, bool right_inside) {
+    switch (op) {
+    case PolygonBooleanOp::And:
+        return left_inside && right_inside;
+    case PolygonBooleanOp::Or:
+        return left_inside || right_inside;
+    case PolygonBooleanOp::Difference:
+        return left_inside && !right_inside;
+    case PolygonBooleanOp::Xor:
+        return left_inside != right_inside;
+    }
+
+    throw std::logic_error("Unknown polygon boolean operation");
+}
+
+std::vector<Segment> extractBoundarySegments(const DCEL& dcel,
+                                             const std::vector<bool>& selected_faces) {
+    std::vector<Segment> segments;
+    for (std::size_t i = 0; i < dcel.halfEdgeCount(); ++i) {
+        const DCEL::HalfEdge& half_edge = dcel.halfEdge(i);
+        const DCEL::HalfEdge& twin = dcel.twinOf(half_edge);
+
+        // Include only the boundary between the selected region and its complement.
+        if (selected_faces[half_edge.face] && !selected_faces[twin.face]) {
+            segments.push_back(dcel.segmentOf(half_edge));
+        }
+    }
+
+    return segments;
+}
+
+std::vector<Segment> polygonBoolean(const std::vector<Segment>& left,
+                                    const std::vector<Segment>& right, PolygonBooleanOp op) {
+    DCEL left_dcel = DCEL::fromSegments(left);
+    DCEL right_dcel = DCEL::fromSegments(right);
+    OverlayResult overlay = segmentOverlay(left_dcel, right_dcel);
+
+    const DCEL& dcel = overlay.dcel;
+    const std::vector<DCEL::FaceParity> left_face_parities = left_dcel.faceParities();
+    const std::vector<DCEL::FaceParity> right_face_parities = right_dcel.faceParities();
+    std::vector<bool> selected_faces(dcel.faceCount(), false);
+
+    assert(overlay.faceLabels.size() == dcel.faceCount());
+    for (std::size_t i = 0; i < dcel.faceCount(); ++i) {
+        const OverlayFaceLabel& faceLabel = overlay.faceLabels[i];
+        const bool left_inside = isFilledFace(left_face_parities, faceLabel.left_face);
+        const bool right_inside = isFilledFace(right_face_parities, faceLabel.right_face);
+        selected_faces[i] = selectFace(op, left_inside, right_inside);
+    }
+
+    return extractBoundarySegments(dcel, selected_faces);
 }
 
 } // namespace
@@ -242,40 +307,22 @@ std::vector<OverlayFacePolygon> overlayFacePolygons(const OverlayResult& overlay
     return polygons;
 }
 
-std::vector<Segment> polygon_and(const std::vector<Segment>& left,
-                                 const std::vector<Segment>& right) {
-    DCEL left_dcel = DCEL::fromSegments(left);
-    DCEL right_dcel = DCEL::fromSegments(right);
-    OverlayResult overlay = segmentOverlay(left_dcel, right_dcel);
+std::vector<Segment> polygonAnd(const std::vector<Segment>& left,
+                                const std::vector<Segment>& right) {
+    return polygonBoolean(left, right, PolygonBooleanOp::And);
+}
 
-    const DCEL& dcel = overlay.dcel;
-    const std::vector<DCEL::FaceParity> left_face_parities = left_dcel.faceParities();
-    const std::vector<DCEL::FaceParity> right_face_parities = right_dcel.faceParities();
-    std::vector<bool> selected_faces(dcel.faceCount(), false);
+std::vector<Segment> polygonOr(const std::vector<Segment>& left,
+                               const std::vector<Segment>& right) {
+    return polygonBoolean(left, right, PolygonBooleanOp::Or);
+}
 
-    auto is_filled_face = [](const std::vector<DCEL::FaceParity>& face_parities,
-                             std::size_t face_index) {
-        return face_index < face_parities.size() &&
-               face_parities[face_index] == DCEL::FaceParity::Interior;
-    };
+std::vector<Segment> polygonDifference(const std::vector<Segment>& left,
+                                       const std::vector<Segment>& right) {
+    return polygonBoolean(left, right, PolygonBooleanOp::Difference);
+}
 
-    assert(overlay.faceLabels.size() == dcel.faceCount());
-    for (std::size_t i = 0; i < dcel.faceCount(); ++i) {
-        const OverlayFaceLabel& faceLabel = overlay.faceLabels[i];
-        selected_faces[i] = is_filled_face(left_face_parities, faceLabel.left_face) &&
-                            is_filled_face(right_face_parities, faceLabel.right_face);
-    }
-
-    std::vector<Segment> segments;
-    for (std::size_t i = 0; i < dcel.halfEdgeCount(); ++i) {
-        const DCEL::HalfEdge& half_edge = dcel.halfEdge(i);
-        const DCEL::HalfEdge& twin = dcel.twinOf(half_edge);
-
-        // Don't include boundary edges between two selected faces
-        if (selected_faces[half_edge.face] && !selected_faces[twin.face]) {
-            segments.push_back(dcel.segmentOf(half_edge));
-        }
-    }
-
-    return segments;
+std::vector<Segment> polygonXor(const std::vector<Segment>& left,
+                                const std::vector<Segment>& right) {
+    return polygonBoolean(left, right, PolygonBooleanOp::Xor);
 }

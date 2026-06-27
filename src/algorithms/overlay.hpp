@@ -42,7 +42,16 @@ OverlayResult segmentOverlay(const std::vector<Segment>& left, const std::vector
 
 std::vector<OverlayFacePolygon> overlayFacePolygons(const OverlayResult& overlay);
 
-std::vector<Segment> polygon_and(const std::vector<Segment>& left,
-                                 const std::vector<Segment>& right);
+std::vector<Segment> polygonAnd(const std::vector<Segment>& left,
+                                const std::vector<Segment>& right);
+
+std::vector<Segment> polygonOr(const std::vector<Segment>& left,
+                               const std::vector<Segment>& right);
+
+std::vector<Segment> polygonDifference(const std::vector<Segment>& left,
+                                       const std::vector<Segment>& right);
+
+std::vector<Segment> polygonXor(const std::vector<Segment>& left,
+                                const std::vector<Segment>& right);
 
 #endif // OVERLAY_HPP

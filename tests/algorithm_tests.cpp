@@ -93,6 +93,14 @@ std::vector<Segment> rectangleHoleSegments(const Point& lower_left, const Point&
     };
 }
 
+double totalPolygonArea(const std::vector<Polygon>& polygons) {
+    double area = 0.0;
+    for (const Polygon& polygon : polygons) {
+        area += polygon.area();
+    }
+    return area;
+}
+
 Segment segment(long long ax, long long ay, long long bx, long long by) {
     return Segment(Point(ax, ay), Point(bx, by));
 }
@@ -447,7 +455,29 @@ TEST(SegmentOverlayTest, LabelsOverlayShowcaseFaces) {
     EXPECT_EQ(counts.neither, 0);
 }
 
-TEST(PolygonAndTest, BuildsIntersectionOfTwoDonuts) {
+TEST(PolygonBooleanTest, AppliesTruthTableToOverlappingRectangles) {
+    const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(4, 4));
+    const std::vector<Segment> right = rectangleSegments(Point(2, 0), Point(6, 4));
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    ASSERT_EQ(intersection.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(intersection), 8.0);
+
+    ASSERT_EQ(union_polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 24.0);
+
+    ASSERT_EQ(difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(difference), 8.0);
+
+    ASSERT_EQ(symmetric_difference.size(), 2);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 16.0);
+}
+
+TEST(PolygonBooleanTest, BuildsIntersectionOfTwoDonuts) {
     std::vector<Segment> layer1 = rectangleSegments(Point(1, 1), Point(7, 6));
     const std::vector<Segment> layer1_hole =
         rectangleHoleSegments(Point(Rational(11, 2), Rational(9, 2)),
@@ -459,7 +489,7 @@ TEST(PolygonAndTest, BuildsIntersectionOfTwoDonuts) {
         rectangleHoleSegments(Point(5, 4), Point(6, 5));
     layer2.insert(layer2.end(), layer2_hole.begin(), layer2_hole.end());
 
-    const std::vector<Segment> intersection_segments = polygon_and(layer1, layer2);
+    const std::vector<Segment> intersection_segments = polygonAnd(layer1, layer2);
     const std::vector<Polygon> polygons = assemblePolygons(intersection_segments);
 
     EXPECT_EQ(intersection_segments.size(), 12);
@@ -468,4 +498,23 @@ TEST(PolygonAndTest, BuildsIntersectionOfTwoDonuts) {
     EXPECT_DOUBLE_EQ(polygons[0].outer_ring.area(), 9.0);
     ASSERT_EQ(polygons[0].inner_rings.size(), 1);
     EXPECT_DOUBLE_EQ(polygons[0].inner_rings[0].area(), 1.75);
+}
+
+TEST(PolygonBooleanTest, ComputesTwoDonutBooleanAreas) {
+    std::vector<Segment> layer1 = rectangleSegments(Point(1, 1), Point(7, 6));
+    const std::vector<Segment> layer1_hole =
+        rectangleHoleSegments(Point(Rational(11, 2), Rational(9, 2)),
+                              Point(Rational(13, 2), Rational(11, 2)));
+    layer1.insert(layer1.end(), layer1_hole.begin(), layer1_hole.end());
+
+    std::vector<Segment> layer2 = rectangleSegments(Point(4, 3), Point(10, 8));
+    const std::vector<Segment> layer2_hole =
+        rectangleHoleSegments(Point(5, 4), Point(6, 5));
+    layer2.insert(layer2.end(), layer2_hole.begin(), layer2_hole.end());
+
+    EXPECT_DOUBLE_EQ(totalPolygonArea(assemblePolygons(polygonAnd(layer1, layer2))), 7.25);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(assemblePolygons(polygonOr(layer1, layer2))), 50.75);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(assemblePolygons(polygonDifference(layer1, layer2))),
+                     21.75);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(assemblePolygons(polygonXor(layer1, layer2))), 43.5);
 }

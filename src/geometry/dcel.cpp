@@ -8,6 +8,9 @@
 #include <cassert>
 #include <cfloat>
 #include <cstddef>
+#ifndef NDEBUG
+#include <iostream>
+#endif
 #include <optional>
 #include <queue>
 #include <stdexcept>
@@ -89,6 +92,14 @@ struct DCELBuilderHalfEdge {
 struct DCELBuilderRing {
     std::vector<std::size_t> half_edges; ///< Ordered half-edge indices around the ring.
 };
+
+#ifndef NDEBUG
+void debugPrintHalfEdgeList(const std::vector<std::size_t>& half_edges) {
+    for (std::size_t half_edge : half_edges) {
+        std::cerr << ' ' << half_edge;
+    }
+}
+#endif
 
 DCEL::FaceParity oppositeFaceParity(DCEL::FaceParity parity) {
     assert(parity != DCEL::FaceParity::Unknown);
@@ -247,6 +258,11 @@ void DCEL::Creator::sortOutgoingHalfEdges(OutgoingHalfEdges& outgoing_half_edges
 }
 
 void DCEL::Creator::linkHalfEdges(const OutgoingHalfEdges& outgoing_half_edges) {
+#ifndef NDEBUG
+    std::cerr << "[dcel] linkHalfEdges: half_edges=" << dcel.half_edges.size()
+              << " vertices=" << outgoing_half_edges.size() << '\n';
+#endif
+
     for (std::size_t edge = 0; edge < dcel.half_edges.size(); edge++) {
         std::size_t twin = dcel.half_edges[edge].twin;
         std::size_t twin_origin = dcel.half_edges[twin].origin;
@@ -264,10 +280,21 @@ void DCEL::Creator::linkHalfEdges(const OutgoingHalfEdges& outgoing_half_edges) 
 
         dcel.half_edges[edge].next = next;
         dcel.half_edges[next].prev = edge;
+
+#ifndef NDEBUG
+        std::cerr << "[dcel]   edge " << edge << " "
+                  << dcel.segmentOf(dcel.half_edges[edge]).toString() << " twin=" << twin
+                  << " dest_vertex=" << twin_origin << " incoming_slot=" << i
+                  << " next_slot=" << next_i << " next=" << next << '\n';
+#endif
     }
 }
 
 void DCEL::Creator::assembleBoundaryRings() {
+#ifndef NDEBUG
+    std::cerr << "[dcel] assembleBoundaryRings\n";
+#endif
+
     std::unordered_set<std::size_t> visited;
 
     for (std::size_t edge = 0; edge < dcel.half_edges.size(); edge++) {
@@ -285,6 +312,11 @@ void DCEL::Creator::assembleBoundaryRings() {
             }
             visited.insert(curr_edge);
             curr_ring_edges.push_back(curr_edge);
+
+#ifndef NDEBUG
+            std::cerr << "[dcel]   walk edge " << curr_edge << " -> "
+                      << dcel.halfEdge(curr_edge).next << '\n';
+#endif
 
             curr_edge = dcel.halfEdge(curr_edge).next;
         } while (curr_edge != first_edge);
@@ -371,6 +403,10 @@ std::size_t DCEL::Creator::findNearestHalfEdgeToLeft(const Point& point) {
 }
 
 void DCEL::Creator::createFaces() {
+#ifndef NDEBUG
+    std::cerr << "[dcel] createFaces: rings=" << boundary_rings.size() << '\n';
+#endif
+
     const std::size_t unbounded_ring_index = ring_union_find.addSet();
 
     groupBoundaryRingsByFace(unbounded_ring_index);
@@ -383,8 +419,23 @@ void DCEL::Creator::createFaces() {
         const std::size_t root_ring_index = ring_union_find.find(ring_index);
         const std::size_t face_index = getOrCreateFace(root_ring_index, root_ring_to_face);
 
+#ifndef NDEBUG
+        std::cerr << "[dcel]   assign ring " << ring_index << " root=" << root_ring_index
+                  << " face=" << face_index << '\n';
+#endif
+
         addBoundaryRingToFace(boundary_ring, face_index);
     }
+
+#ifndef NDEBUG
+    for (std::size_t face_index = 0; face_index < dcel.faces.size(); ++face_index) {
+        const DCEL::Face& face = dcel.faces[face_index];
+        std::cerr << "[dcel]   face " << face_index << " outer=" << face.outer_component
+                  << " inners=";
+        debugPrintHalfEdgeList(face.inner_components);
+        std::cerr << '\n';
+    }
+#endif
 }
 
 void DCEL::Creator::groupBoundaryRingsByFace(const std::size_t unbounded_ring_index) {
@@ -403,11 +454,21 @@ void DCEL::Creator::groupBoundaryRingsByFace(const std::size_t unbounded_ring_in
         std::size_t nearest_left_half_edge = findNearestHalfEdgeToLeft(leftmost_point);
 
         if (nearest_left_half_edge == DCEL::npos) {
+#ifndef NDEBUG
+            std::cerr << "[dcel]   group ring " << ring_index
+                      << " with unbounded face: leftmost=" << leftmost_point.toString() << '\n';
+#endif
             ring_union_find.unite(ring_index, unbounded_ring_index);
         } else {
             std::size_t nearest_left_ring = half_edges[nearest_left_half_edge].boundary_ring;
             assert(nearest_left_ring != DCEL::npos);
             assert(nearest_left_ring != ring_index);
+#ifndef NDEBUG
+            std::cerr << "[dcel]   group ring " << ring_index << " with ring " << nearest_left_ring
+                      << ": leftmost=" << leftmost_point.toString()
+                      << " nearest_left_edge=" << nearest_left_half_edge << ' '
+                      << dcel.segmentOf(dcel.half_edges[nearest_left_half_edge]).toString() << '\n';
+#endif
             ring_union_find.unite(ring_index, nearest_left_ring);
         }
     }
@@ -452,8 +513,16 @@ void DCEL::Creator::addBoundaryRingToFace(const DCELBuilderRing& boundary_ring,
     if (isOuter(boundary_ring)) {
         assert(dcel.faces[face_index].outer_component == DCEL::npos);
         dcel.faces[face_index].outer_component = half_edge_index;
+#ifndef NDEBUG
+        std::cerr << "[dcel]     face " << face_index << " outer_component=" << half_edge_index
+                  << '\n';
+#endif
     } else {
         dcel.faces[face_index].inner_components.push_back(half_edge_index);
+#ifndef NDEBUG
+        std::cerr << "[dcel]     face " << face_index << " inner_component=" << half_edge_index
+                  << '\n';
+#endif
     }
 }
 
@@ -514,6 +583,17 @@ void DCEL::Creator::addBoundaryRing(const std::vector<std::size_t>& half_edge_in
     for (const std::size_t ring_half_edge_index : half_edge_indices) {
         half_edges[ring_half_edge_index].boundary_ring = ring_index;
     }
+
+#ifndef NDEBUG
+    const LinearRing ring = linearRingOf(boundary_rings[ring_index]);
+    std::cerr << "[dcel]   ring " << ring_index << " edges=";
+    debugPrintHalfEdgeList(half_edge_indices);
+    std::cerr << " area=" << ring.signedArea() << " outer=" << ring.isOuter() << " points=";
+    for (const Point& point : ring.points) {
+        std::cerr << ' ' << point.toString();
+    }
+    std::cerr << '\n';
+#endif
 }
 
 LinearRing DCEL::Creator::linearRingOf(const DCELBuilderRing& boundary_ring) const {

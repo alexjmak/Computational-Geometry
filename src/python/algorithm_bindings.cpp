@@ -85,5 +85,8 @@ void bindAlgorithms(py::module_& module) {
                py::overload_cast<const std::vector<Segment>&, const std::vector<Segment>&>(
                    &segmentOverlay),
                py::arg("left"), py::arg("right"));
-    module.def("polygon_and", &polygon_and, py::arg("left"), py::arg("right"));
+    module.def("polygon_and", &polygonAnd, py::arg("left"), py::arg("right"));
+    module.def("polygon_or", &polygonOr, py::arg("left"), py::arg("right"));
+    module.def("polygon_difference", &polygonDifference, py::arg("left"), py::arg("right"));
+    module.def("polygon_xor", &polygonXor, py::arg("left"), py::arg("right"));
 }
