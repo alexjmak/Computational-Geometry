@@ -62,7 +62,8 @@ void bindGui(py::module_& module) {
         .def("add_polygon", &Plot::addPolygon, py::arg("polygon"),
              py::arg("face_color") = "lightblue", py::arg("edge_color") = "blue",
              py::arg("alpha") = 0.35)
-        .def("set_document", &Plot::setDocument, py::arg("document"))
+        .def("set_document", static_cast<void (Plot::*)(const Document&)>(&Plot::setDocument),
+             py::arg("document"))
         .def("clear", &Plot::clear)
         .def("show", &showPlotPython);
 

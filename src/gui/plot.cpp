@@ -153,8 +153,18 @@ void Plot::addRingFill(const std::vector<std::vector<Point>>& rings, const std::
 }
 
 void Plot::setDocument(const Document& document) {
+    setDocument(document, {});
+}
+
+void Plot::setDocument(const Document& document, const std::vector<bool>& layer_visibility) {
     clear();
-    for (const Layer& layer : document.layers) {
+    for (std::size_t i = 0; i < document.layers.size(); ++i) {
+        const bool visible = i >= layer_visibility.size() || layer_visibility[i];
+        if (!visible) {
+            continue;
+        }
+
+        const Layer& layer = document.layers[i];
         if (!layer.segments.empty()) {
             addSegments(layer.segments);
         }

@@ -62,6 +62,11 @@ class Plot : public QWidget {
     /// \param document The document to render.
     void setDocument(const Document& document);
 
+    /// \brief Replace the current plot contents with selected visible document layers.
+    /// \param document The document to render.
+    /// \param layer_visibility Visibility flags by layer index. Missing flags default to visible.
+    void setDocument(const Document& document, const std::vector<bool>& layer_visibility);
+
     /// \brief Remove all plotted geometry and reset the tracked bounds.
     void clear();
 

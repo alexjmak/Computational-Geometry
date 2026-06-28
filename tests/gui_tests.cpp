@@ -100,6 +100,26 @@ TEST(PlotTest, SetDocumentRendersAllLayerGeometry) {
     EXPECT_EQ(chart->series().size(), 3);
 }
 
+TEST(PlotTest, SetDocumentCanHideLayers) {
+    Document document;
+    Layer visible_layer;
+    visible_layer.points = {Point(0, 0)};
+    Layer hidden_layer;
+    hidden_layer.points = {Point(1, 1)};
+    document.layers = {visible_layer, hidden_layer};
+
+    Plot plot;
+    plot.setDocument(document, {true, false});
+
+    QChart* chart = chartFor(plot);
+    ASSERT_NE(chart, nullptr);
+    ASSERT_EQ(chart->series().size(), 1);
+    auto* series = qobject_cast<QScatterSeries*>(chart->series().first());
+    ASSERT_NE(series, nullptr);
+    ASSERT_EQ(series->points().size(), 1);
+    EXPECT_EQ(series->points().first(), QPointF(0, 0));
+}
+
 TEST(PlotTest, AddPolygonUsesCompoundFillForHoles) {
     const LinearRing outer({Point(0, 0), Point(4, 0), Point(4, 4), Point(0, 4)});
     const LinearRing hole({Point(1, 1), Point(1, 3), Point(3, 3), Point(3, 1)});
