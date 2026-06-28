@@ -152,6 +152,67 @@ DCEL::FaceParity oppositeFaceParity(DCEL::FaceParity parity) {
     return DCEL::FaceParity::Exterior;
 }
 
+#ifndef NDEBUG
+std::string faceParityName(DCEL::FaceParity parity) {
+    switch (parity) {
+    case DCEL::FaceParity::Unknown:
+        return "Unknown";
+    case DCEL::FaceParity::Exterior:
+        return "Exterior";
+    case DCEL::FaceParity::Interior:
+        return "Interior";
+    }
+
+    return "<invalid>";
+}
+
+void dumpFaceBoundary(const DCEL& dcel, std::size_t face_index) {
+    const DCEL::Face& face = dcel.face(face_index);
+    auto dump_component = [&](const char* label, std::size_t component) {
+        std::cerr << "  " << label << " component " << component << ":\n";
+        if (component == DCEL::npos) {
+            std::cerr << "    <none>\n";
+            return;
+        }
+
+        std::size_t curr_half_edge = component;
+        do {
+            const DCEL::HalfEdge& half_edge = dcel.halfEdge(curr_half_edge);
+            std::cerr << "    edge " << curr_half_edge << " face=" << half_edge.face
+                      << " twin=" << half_edge.twin << " next=" << half_edge.next
+                      << " segment=" << dcel.segmentOf(half_edge).toString() << "\n";
+            curr_half_edge = half_edge.next;
+        } while (curr_half_edge != component);
+    };
+
+    dump_component("outer", face.outer_component);
+    for (std::size_t inner_component : face.inner_components) {
+        dump_component("inner", inner_component);
+    }
+}
+
+void dumpFaceParityConflict(const DCEL& dcel, const std::vector<DCEL::FaceParity>& face_parities,
+                            std::size_t face_index, std::size_t adjacent_face,
+                            std::size_t half_edge_index, DCEL::FaceParity expected_parity) {
+    const DCEL::HalfEdge& half_edge = dcel.halfEdge(half_edge_index);
+    const DCEL::HalfEdge& twin_half_edge = dcel.twinOf(half_edge);
+    std::cerr << "[dcel] face parity conflict\n";
+    std::cerr << "  current_face=" << face_index
+              << " parity=" << faceParityName(face_parities[face_index]) << "\n";
+    std::cerr << "  adjacent_face=" << adjacent_face
+              << " existing_parity=" << faceParityName(face_parities[adjacent_face])
+              << " expected_parity=" << faceParityName(expected_parity) << "\n";
+    std::cerr << "  crossing_edge=" << half_edge_index
+              << " segment=" << dcel.segmentOf(half_edge).toString() << "\n";
+    std::cerr << "  twin_edge=" << half_edge.twin
+              << " segment=" << dcel.segmentOf(twin_half_edge).toString() << "\n";
+    std::cerr << "  current face boundary:\n";
+    dumpFaceBoundary(dcel, face_index);
+    std::cerr << "  adjacent face boundary:\n";
+    dumpFaceBoundary(dcel, adjacent_face);
+}
+#endif
+
 } // namespace
 
 /// \brief Incremental builder for constructing a DCEL from polygon boundaries.
@@ -849,6 +910,12 @@ std::vector<DCEL::FaceParity> DCEL::faceParities() const {
                         face_parities[adjacent_face] = adjacent_parity;
                         queue.push(adjacent_face);
                     } else {
+#ifndef NDEBUG
+                        if (face_parities[adjacent_face] != adjacent_parity) {
+                            dumpFaceParityConflict(*this, face_parities, face_index, adjacent_face,
+                                                   curr_half_edge, adjacent_parity);
+                        }
+#endif
                         assert(face_parities[adjacent_face] == adjacent_parity);
                     }
 

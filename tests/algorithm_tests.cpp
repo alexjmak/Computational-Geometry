@@ -93,6 +93,15 @@ std::vector<Segment> rectangleHoleSegments(const Point& lower_left, const Point&
     };
 }
 
+std::vector<Segment> ringSegments(const std::vector<Point>& points) {
+    LinearRing ring(points);
+    return ring.segments();
+}
+
+void appendSegments(std::vector<Segment>& segments, const std::vector<Segment>& extra_segments) {
+    segments.insert(segments.end(), extra_segments.begin(), extra_segments.end());
+}
+
 double totalPolygonArea(const std::vector<Polygon>& polygons) {
     double area = 0.0;
     for (const Polygon& polygon : polygons) {
@@ -498,6 +507,23 @@ TEST(PolygonBooleanTest, BuildsIntersectionOfTwoDonuts) {
     EXPECT_DOUBLE_EQ(polygons[0].outer_ring.area(), 9.0);
     ASSERT_EQ(polygons[0].inner_rings.size(), 1);
     EXPECT_DOUBLE_EQ(polygons[0].inner_rings[0].area(), 1.75);
+}
+
+TEST(PolygonBooleanTest, DISABLED_AssemblesSharedEdgeRectangleAndConcaveArrow) {
+    std::vector<Segment> segments = rectangleSegments(Point(28, 7), Point(33, 11));
+    appendSegments(segments, ringSegments({
+                                 Point(35, 1),
+                                 Point(41, 5),
+                                 Point(35, 11),
+                                 Point(36, 7),
+                                 Point(32, 7),
+                                 Point(32, 3),
+                                 Point(36, 3),
+                             }));
+
+    const std::vector<Polygon> polygons = assemblePolygons(segments);
+
+    EXPECT_FALSE(polygons.empty());
 }
 
 TEST(PolygonBooleanTest, ComputesTwoDonutBooleanAreas) {
