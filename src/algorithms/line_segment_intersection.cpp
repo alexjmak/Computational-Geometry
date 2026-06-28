@@ -11,6 +11,48 @@
 #include <unordered_set>
 #include <vector>
 
+/*
+ * Line segment intersection overview
+ *
+ * This file implements two versions of the segment-intersection problem:
+ * a straightforward brute-force checker and a sweep-line algorithm in the
+ * Bentley-Ottmann family. Both return the set of geometric points where at
+ * least two input segments intersect. Overlapping collinear segments are
+ * reported by their overlap endpoints, matching the rest of the library's
+ * point-set interface.
+ *
+ * The sweep-line implementation processes event points from top to bottom,
+ * with left-to-right tie breaking. The event queue initially contains segment
+ * endpoints. As the sweep discovers that neighboring active segments will
+ * intersect below the current event, that intersection point is inserted into
+ * the queue as a future event.
+ *
+ * High-level sweep steps:
+ *
+ * 1. Canonicalize each segment by y-order and seed the event queue with its
+ *    upper and lower endpoints.
+ * 2. Maintain an active set of segments intersecting the current sweep line.
+ *    The active set is ordered by each segment's intersection with the
+ *    horizontal line through the current event, with slope-based tie breaking
+ *    for segments meeting at the same event point.
+ * 3. At each event, collect:
+ *    - segments whose upper endpoint is the event,
+ *    - active segments that contain the event in their interior,
+ *    - segments whose lower endpoint is the event.
+ * 4. If at least two segments meet at the event, record that event point as an
+ *    intersection.
+ * 5. Remove affected active segments, advance the sweep event, then reinsert
+ *    the segments that continue below the event.
+ * 6. Only newly adjacent active segments can produce the next undiscovered
+ *    intersection, so test those neighbor pairs and enqueue any valid future
+ *    event.
+ *
+ * The implementation has more bookkeeping than the textbook sketch because it
+ * needs deterministic behavior for exact rational coordinates, duplicate or
+ * reversed input segments, endpoint touches, horizontal segments, and
+ * collinear overlaps.
+ */
+
 namespace sweep {
 
 using SegmentId = std::size_t;

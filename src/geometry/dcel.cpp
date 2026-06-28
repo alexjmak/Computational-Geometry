@@ -19,6 +19,48 @@
 #include <utility>
 #include <vector>
 
+/*
+ * DCEL construction overview
+ *
+ * This file builds a doubly-connected edge list (DCEL) from an arbitrary set
+ * of input boundary segments. A DCEL stores each undirected edge as two directed
+ * half-edges, links half-edges around vertices and faces, and records one outer
+ * component plus zero or more inner components for each face. The structure is
+ * used by polygon assembly, overlay, boolean operations, and face parity
+ * classification.
+ *
+ * General algorithm created here:
+ *
+ * 1. Planarize the input segments. Intersecting segments are split so every
+ *    crossing, touch, or overlap endpoint becomes a DCEL vertex. After this
+ *    step, edges only meet at shared endpoints.
+ * 2. Create a pair of twin half-edges for each directed planar segment
+ *    and create the endpoint vertices.
+ * 3. For every vertex, collect outgoing half-edges and sort them by
+ *    counterclockwise angle around the vertex.
+ * 4. Link next/prev pointers by walking from each half-edge to the predecessor
+ *    of its twin in the destination vertex's angular order. This is the
+ *    standard planar subdivision rule that keeps a boundary traversal with the
+ *    incident face consistently on one side.
+ * 5. Traverse unvisited next pointers to assemble directed boundary rings.
+ *    Each ring is classified by orientation: counterclockwise rings are outer
+ *    boundaries of bounded faces, and clockwise rings bound holes or the
+ *    unbounded exterior.
+ * 6. Group boundary rings that belong to the same face. For each non-outer
+ *    ring, the builder finds the half-edge immediately to the left of that
+ *    ring's leftmost vertex. The non-outer ring and the ring containing that
+ *    left half-edge bound the same face; if no such edge exists, the ring is
+ *    grouped with the unbounded face. This implementation answers that query
+ *    by scanning the half-edges; it could later be replaced by a DCEL-specific
+ *    sweep-line pass.
+ * 7. Materialize DCEL face records from the ring groups, attach outer and inner
+ *    component representatives, and assign the final face index to every
+ *    half-edge in each boundary ring.
+ *
+ * Later helpers derive polygons from finite faces and compute face parity by
+ * traversing the face-adjacency graph from the unbounded face.
+ */
+
 namespace {
 
 /// \brief Disjoint-set structure for grouping boundary rings that bound the same face.
