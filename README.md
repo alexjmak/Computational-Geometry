@@ -189,9 +189,11 @@ inside a coordinate pair.
 
 ## GUI
 
-Build the project, then run the Qt viewer against a YAML document:
+Build the project, then run the Qt viewer. Use File > Open to choose a YAML
+document, or pass one on the command line:
 
 ```bash
+./build-debug/cgeom-gui
 ./build-debug/cgeom-gui output.yaml
 ```
 
