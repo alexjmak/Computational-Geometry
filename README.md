@@ -207,6 +207,14 @@ cmake --build build-debug --target docs
 
 Generated documentation is written under `docs/`, which is ignored by Git.
 
+## References
+
+Several algorithms and data structures in this project are informed by
+*Computational Geometry: Algorithms and Applications*, Third Edition, by
+Mark de Berg, Otfried Cheong, Marc van Kreveld, and Mark Overmars. The
+C++/Python implementations, edge-case handling, APIs, tests, and project
+integration were developed independently for this project.
+
 ## Project Layout
 
 - `src/geometry`: core primitives and predicates
