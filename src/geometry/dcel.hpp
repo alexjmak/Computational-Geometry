@@ -47,11 +47,12 @@ class DCEL {
         /// \param origin The index of this half-edge's origin vertex.
         explicit HalfEdge(std::size_t origin);
 
-        std::size_t origin; ///< The origin vertex of this directed half-edge.
-        std::size_t twin;   ///< The oppositely directed half-edge.
-        std::size_t next;   ///< The next half-edge around the incident face.
-        std::size_t prev;   ///< The previous half-edge around the incident face.
-        std::size_t face;   ///< The face incident to this half-edge.
+        std::size_t origin;         ///< The origin vertex of this directed half-edge.
+        std::size_t twin;           ///< The oppositely directed half-edge.
+        std::size_t next;           ///< The next half-edge around the incident face.
+        std::size_t prev;           ///< The previous half-edge around the incident face.
+        std::size_t face;           ///< The face incident to this half-edge.
+        std::size_t boundary_count; ///< Number of input boundaries represented by this edge pair.
     };
 
     /// \brief A face bounded by outer and optional inner components.

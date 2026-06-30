@@ -150,25 +150,20 @@ OverlayBucketCounts countOverlayBuckets(const OverlayResult& overlay) {
 
 std::vector<Segment> showcaseSolidLayer() {
     return {
-        segment(20, 72, 82, 71), segment(82, 71, 92, 46),
-        segment(92, 46, 74, 21), segment(74, 21, 26, 28),
-        segment(26, 28, 13, 57), segment(13, 57, 20, 72),
-        segment(20, 72, 35, 62), segment(35, 62, 60, 60),
-        segment(60, 60, 82, 71), segment(35, 62, 40, 38),
-        segment(40, 38, 64, 45), segment(60, 60, 64, 45),
-        segment(64, 45, 82, 48), segment(74, 21, 82, 48),
-        segment(26, 28, 40, 38),
+        segment(20, 72, 82, 71), segment(82, 71, 92, 46), segment(92, 46, 74, 21),
+        segment(74, 21, 26, 28), segment(26, 28, 13, 57), segment(13, 57, 20, 72),
+        segment(20, 72, 35, 62), segment(35, 62, 60, 60), segment(60, 60, 82, 71),
+        segment(35, 62, 40, 38), segment(40, 38, 64, 45), segment(60, 60, 64, 45),
+        segment(64, 45, 82, 48), segment(74, 21, 82, 48), segment(26, 28, 40, 38),
     };
 }
 
 std::vector<Segment> showcaseDottedLayer() {
     return {
-        segment(3, 70, 42, 86), segment(42, 86, 74, 58),
-        segment(74, 58, 70, 43), segment(70, 43, 28, 9),
-        segment(28, 9, 3, 35),   segment(3, 35, 3, 70),
-        segment(9, 60, 38, 65),  segment(38, 65, 52, 53),
-        segment(52, 53, 47, 44), segment(47, 44, 11, 44),
-        segment(11, 44, 9, 60),
+        segment(3, 70, 42, 86),  segment(42, 86, 74, 58), segment(74, 58, 70, 43),
+        segment(70, 43, 28, 9),  segment(28, 9, 3, 35),   segment(3, 35, 3, 70),
+        segment(9, 60, 38, 65),  segment(38, 65, 52, 53), segment(52, 53, 47, 44),
+        segment(47, 44, 11, 44), segment(11, 44, 9, 60),
     };
 }
 
@@ -488,14 +483,12 @@ TEST(PolygonBooleanTest, AppliesTruthTableToOverlappingRectangles) {
 
 TEST(PolygonBooleanTest, BuildsIntersectionOfTwoDonuts) {
     std::vector<Segment> layer1 = rectangleSegments(Point(1, 1), Point(7, 6));
-    const std::vector<Segment> layer1_hole =
-        rectangleHoleSegments(Point(Rational(11, 2), Rational(9, 2)),
-                              Point(Rational(13, 2), Rational(11, 2)));
+    const std::vector<Segment> layer1_hole = rectangleHoleSegments(
+        Point(Rational(11, 2), Rational(9, 2)), Point(Rational(13, 2), Rational(11, 2)));
     layer1.insert(layer1.end(), layer1_hole.begin(), layer1_hole.end());
 
     std::vector<Segment> layer2 = rectangleSegments(Point(4, 3), Point(10, 8));
-    const std::vector<Segment> layer2_hole =
-        rectangleHoleSegments(Point(5, 4), Point(6, 5));
+    const std::vector<Segment> layer2_hole = rectangleHoleSegments(Point(5, 4), Point(6, 5));
     layer2.insert(layer2.end(), layer2_hole.begin(), layer2_hole.end());
 
     const std::vector<Segment> intersection_segments = polygonAnd(layer1, layer2);
@@ -509,7 +502,7 @@ TEST(PolygonBooleanTest, BuildsIntersectionOfTwoDonuts) {
     EXPECT_DOUBLE_EQ(polygons[0].inner_rings[0].area(), 1.75);
 }
 
-TEST(PolygonBooleanTest, DISABLED_AssemblesSharedEdgeRectangleAndConcaveArrow) {
+TEST(PolygonBooleanTest, AssemblesSharedEdgeRectangleAndConcaveArrow) {
     std::vector<Segment> segments = rectangleSegments(Point(28, 7), Point(33, 11));
     appendSegments(segments, ringSegments({
                                  Point(35, 1),
@@ -528,19 +521,16 @@ TEST(PolygonBooleanTest, DISABLED_AssemblesSharedEdgeRectangleAndConcaveArrow) {
 
 TEST(PolygonBooleanTest, ComputesTwoDonutBooleanAreas) {
     std::vector<Segment> layer1 = rectangleSegments(Point(1, 1), Point(7, 6));
-    const std::vector<Segment> layer1_hole =
-        rectangleHoleSegments(Point(Rational(11, 2), Rational(9, 2)),
-                              Point(Rational(13, 2), Rational(11, 2)));
+    const std::vector<Segment> layer1_hole = rectangleHoleSegments(
+        Point(Rational(11, 2), Rational(9, 2)), Point(Rational(13, 2), Rational(11, 2)));
     layer1.insert(layer1.end(), layer1_hole.begin(), layer1_hole.end());
 
     std::vector<Segment> layer2 = rectangleSegments(Point(4, 3), Point(10, 8));
-    const std::vector<Segment> layer2_hole =
-        rectangleHoleSegments(Point(5, 4), Point(6, 5));
+    const std::vector<Segment> layer2_hole = rectangleHoleSegments(Point(5, 4), Point(6, 5));
     layer2.insert(layer2.end(), layer2_hole.begin(), layer2_hole.end());
 
     EXPECT_DOUBLE_EQ(totalPolygonArea(assemblePolygons(polygonAnd(layer1, layer2))), 7.25);
     EXPECT_DOUBLE_EQ(totalPolygonArea(assemblePolygons(polygonOr(layer1, layer2))), 50.75);
-    EXPECT_DOUBLE_EQ(totalPolygonArea(assemblePolygons(polygonDifference(layer1, layer2))),
-                     21.75);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(assemblePolygons(polygonDifference(layer1, layer2))), 21.75);
     EXPECT_DOUBLE_EQ(totalPolygonArea(assemblePolygons(polygonXor(layer1, layer2))), 43.5);
 }

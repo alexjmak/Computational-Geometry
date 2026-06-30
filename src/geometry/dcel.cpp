@@ -180,7 +180,8 @@ void dumpFaceBoundary(const DCEL& dcel, std::size_t face_index) {
             const DCEL::HalfEdge& half_edge = dcel.halfEdge(curr_half_edge);
             std::cerr << "    edge " << curr_half_edge << " face=" << half_edge.face
                       << " twin=" << half_edge.twin << " next=" << half_edge.next
-                      << " segment=" << dcel.segmentOf(half_edge).toString() << "\n";
+                      << " segment=" << dcel.segmentOf(half_edge).toString()
+                      << " boundary_count=" << half_edge.boundary_count << "\n";
             curr_half_edge = half_edge.next;
         } while (curr_half_edge != component);
     };
@@ -731,24 +732,38 @@ DCEL::Creator::leftmostHalfEdge(const std::vector<std::size_t>& half_edge_indice
 }
 
 std::size_t DCEL::Creator::getOrCreateHalfEdgePair(const Segment& segment) {
-    const Segment reversed_segment = segment.reversed();
+    const Segment twin_segment = segment.reversed();
     const auto found = segment_map.find(segment);
-    if (found != segment_map.end()) {
-        assert(segment_map.contains(reversed_segment));
-        return found->second;
-    }
+    std::size_t half_edge_index = DCEL::npos;
+    std::size_t twin_half_edge_index = DCEL::npos;
+    const bool created = found == segment_map.end();
 
-    const std::size_t half_edge_index = createHalfEdge(segment);
-    const std::size_t twin_half_edge_index = createHalfEdge(reversed_segment);
+    if (created) {
+        half_edge_index = createHalfEdge(segment);
+        twin_half_edge_index = createHalfEdge(twin_segment);
+    } else {
+        const auto twin_found = segment_map.find(twin_segment);
+        assert(twin_found != segment_map.end());
+        half_edge_index = found->second;
+        twin_half_edge_index = twin_found->second;
+    }
 
     DCEL::HalfEdge& half_edge = dcel.half_edges[half_edge_index];
     DCEL::HalfEdge& twin_half_edge = dcel.half_edges[twin_half_edge_index];
 
-    half_edge.twin = twin_half_edge_index;
-    twin_half_edge.twin = half_edge_index;
+    if (created) {
+        half_edge.twin = twin_half_edge_index;
+        twin_half_edge.twin = half_edge_index;
 
-    segment_map[segment] = half_edge_index;
-    segment_map[reversed_segment] = twin_half_edge_index;
+        segment_map[segment] = half_edge_index;
+        segment_map[twin_segment] = twin_half_edge_index;
+    } else {
+        assert(half_edge.twin == twin_half_edge_index);
+        assert(twin_half_edge.twin == half_edge_index);
+    }
+
+    ++half_edge.boundary_count;
+    ++twin_half_edge.boundary_count;
 
     return half_edge_index;
 }
@@ -758,7 +773,8 @@ DCEL::DCELPoint::DCELPoint(Rational x, Rational y) : Point(x, y), half_edge(DCEL
 DCEL::DCELPoint::DCELPoint(const Point& p) : Point(p), half_edge(DCEL::npos) {}
 
 DCEL::HalfEdge::HalfEdge(std::size_t origin)
-    : origin(origin), twin(DCEL::npos), next(DCEL::npos), prev(DCEL::npos), face(DCEL::npos) {}
+    : origin(origin), twin(DCEL::npos), next(DCEL::npos), prev(DCEL::npos), face(DCEL::npos),
+      boundary_count(0) {}
 
 DCEL::Face::Face() : outer_component(DCEL::npos), inner_components() {}
 
@@ -896,13 +912,15 @@ std::vector<DCEL::FaceParity> DCEL::faceParities() const {
             queue.pop();
 
             const Face& face = faces[face_index];
-            const FaceParity adjacent_parity = oppositeFaceParity(face_parities[face_index]);
+            const FaceParity parity = face_parities[face_index];
 
             auto visit_boundary_component = [&](std::size_t component) {
                 std::size_t curr_half_edge = component;
                 do {
                     const HalfEdge& half_edge = half_edges[curr_half_edge];
                     const HalfEdge& twin_half_edge = twinOf(half_edge);
+                    const FaceParity adjacent_parity =
+                        half_edge.boundary_count % 2 == 1 ? oppositeFaceParity(parity) : parity;
                     const std::size_t adjacent_face = twin_half_edge.face;
                     assert(adjacent_face != npos);
 

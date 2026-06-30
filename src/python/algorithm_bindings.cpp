@@ -65,7 +65,7 @@ void bindAlgorithms(py::module_& module) {
         .def_readonly("label", &OverlayFacePolygon::label);
 
     py::class_<OverlayResult>(module, "OverlayResult")
-        .def_readonly("face_labels", &OverlayResult::faceLabels)
+        .def_readonly("face_labels", &OverlayResult::face_labels)
         .def("polygons", &overlayFacePolygons);
 
     module.def("assemble_rings", &assembleRings, py::arg("segments"));

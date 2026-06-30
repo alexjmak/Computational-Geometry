@@ -5,3 +5,4 @@ docs
 *.yaml
 __pycache__
 scripts/*.so
+*debug.py

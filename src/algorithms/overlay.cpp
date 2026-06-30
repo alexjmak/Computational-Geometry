@@ -108,9 +108,9 @@ std::vector<Segment> polygonBoolean(const std::vector<Segment>& left,
     const std::vector<DCEL::FaceParity> right_face_parities = right_dcel.faceParities();
     std::vector<bool> selected_faces(dcel.faceCount(), false);
 
-    assert(overlay.faceLabels.size() == dcel.faceCount());
+    assert(overlay.face_labels.size() == dcel.faceCount());
     for (std::size_t i = 0; i < dcel.faceCount(); ++i) {
-        const OverlayFaceLabel& faceLabel = overlay.faceLabels[i];
+        const OverlayFaceLabel& faceLabel = overlay.face_labels[i];
         const bool left_inside = isFilledFace(left_face_parities, faceLabel.left_face);
         const bool right_inside = isFilledFace(right_face_parities, faceLabel.right_face);
         selected_faces[i] = selectFace(op, left_inside, right_inside);
@@ -124,7 +124,7 @@ std::vector<Segment> polygonBoolean(const std::vector<Segment>& left,
 std::vector<Segment> planarizeSegments(const std::vector<Segment>& segments) {
     std::vector<std::vector<Point>> intersections = lineSegmentIntersectionBySegments(segments);
 
-    std::unordered_set<Segment> split_segments;
+    std::vector<Segment> split_segments;
     for (std::size_t i = 0; i < segments.size(); i++) {
         const Segment& segment = segments[i];
         const std::vector<Point>& split_pts = intersections[i];
@@ -134,20 +134,18 @@ std::vector<Segment> planarizeSegments(const std::vector<Segment>& segments) {
         for (std::size_t j = 0; j < split_pts.size(); j++) {
             const Point* curr = &split_pts[j];
             if (*curr != *prev) {
-                split_segments.insert(Segment(*prev, *curr));
+                split_segments.push_back(Segment(*prev, *curr));
             }
             prev = curr;
         }
 
         // Include last section until end
         if (segment.end != *prev) {
-            split_segments.insert(Segment(*prev, segment.end));
+            split_segments.push_back(Segment(*prev, segment.end));
         }
     }
 
-    std::vector<Segment> result(split_segments.begin(), split_segments.end());
-    std::sort(result.begin(), result.end());
-    return result;
+    return split_segments;
 }
 
 std::vector<OverlaySplitEdge> planarizeSegments(const std::vector<OverlaySourceEdge>& source_edges,
@@ -284,7 +282,7 @@ OverlayResult segmentOverlay(const DCEL& left, const DCEL& right) {
     }
     return {
         .dcel = std::move(dcel),
-        .faceLabels = std::move(face_labels),
+        .face_labels = std::move(face_labels),
     };
 }
 
@@ -300,9 +298,9 @@ std::vector<OverlayFacePolygon> overlayFacePolygons(const OverlayResult& overlay
             continue;
         }
 
-        assert(i < overlay.faceLabels.size());
+        assert(i < overlay.face_labels.size());
         polygons.push_back(
-            {.face_index = i, .polygon = std::move(*polygon), .label = overlay.faceLabels[i]});
+            {.face_index = i, .polygon = std::move(*polygon), .label = overlay.face_labels[i]});
     }
     return polygons;
 }
