@@ -1,10 +1,10 @@
 #include "algorithms/horizontal_ray_query.hpp"
 #include "algorithms/sweep_line.hpp"
+#include "debug/logging.hpp"
 #include "geometry/predicates.hpp"
 #include <cassert>
 #include <climits>
 #include <cstddef>
-#include <iostream>
 #include <map>
 #include <optional>
 #include <set>
@@ -96,8 +96,8 @@ void RayHitState::printElement(SegmentId id) {
     const ActiveSegment& key = segments_by_id[id];
     auto point = key.pointAtEvent(curr_event.point);
     if (point) {
-        std::cout << "#" << key.id << " " << key.segment.toString() << ": " << point->toString()
-                  << std::endl;
+        debug::rayQuery() << "#" << key.id << " " << key.segment.toString() << ": "
+                          << point->toString() << std::endl;
     }
 }
 
@@ -108,10 +108,10 @@ void RayHitState::printElement(SegmentId id) {
 /// \returns The nearest active segment strictly left of a query event, or std::nullopt.
 std::optional<SegmentId> handleEventPoint(EventPoint& ls_point, RayHitEvent& event,
                                           RayHitState& line_sweep) {
-#ifndef NDEBUG
-    std::cout << std::endl;
-    std::cout << "Event: " << ls_point.point.toString() << std::endl;
-#endif
+    if (debug::rayQueryEnabled()) {
+        debug::rayQuery() << std::endl;
+        debug::rayQuery() << "Event: " << ls_point.point.toString() << std::endl;
+    }
 
     auto& curr_segments = line_sweep.curr_segments;
     const auto& segments_by_id = line_sweep.segments_by_id;
@@ -119,18 +119,18 @@ std::optional<SegmentId> handleEventPoint(EventPoint& ls_point, RayHitEvent& eve
     const auto& lower_segments = event.lower_segments;
     const bool is_query = !event.query_ids.empty();
 
-#ifndef NDEBUG
-    std::cout << "Active segments before event:" << std::endl;
-    for (SegmentId id : curr_segments) {
-        line_sweep.printElement(id);
+    if (debug::rayQueryEnabled()) {
+        debug::rayQuery() << "Active segments before event:" << std::endl;
+        for (SegmentId id : curr_segments) {
+            line_sweep.printElement(id);
+        }
     }
-#endif
 
     for (SegmentId id : lower_segments) {
         const ActiveSegment& s = segments_by_id[id];
-#ifndef NDEBUG
-        std::cout << "Remove lower " << s.segment.toString() << std::endl;
-#endif
+        if (debug::rayQueryEnabled()) {
+            debug::rayQuery() << "Remove lower " << s.segment.toString() << std::endl;
+        }
         [[maybe_unused]] size_t count = curr_segments.erase(id);
         assert(count == 1);
     }
@@ -141,18 +141,18 @@ std::optional<SegmentId> handleEventPoint(EventPoint& ls_point, RayHitEvent& eve
     // Insert segments that begin at this event so they are active below the current sweep line.
     for (SegmentId id : upper_segments) {
         const ActiveSegment& s = segments_by_id[id];
-#ifndef NDEBUG
-        std::cout << "Insert upper " << s.segment.toString() << std::endl;
-#endif
+        if (debug::rayQueryEnabled()) {
+            debug::rayQuery() << "Insert upper " << s.segment.toString() << std::endl;
+        }
         curr_segments.insert(id);
     }
 
-#ifndef NDEBUG
-    std::cout << "Active segments after event:" << std::endl;
-    for (SegmentId id : curr_segments) {
-        line_sweep.printElement(id);
+    if (debug::rayQueryEnabled()) {
+        debug::rayQuery() << "Active segments after event:" << std::endl;
+        for (SegmentId id : curr_segments) {
+            line_sweep.printElement(id);
+        }
     }
-#endif
 
     std::optional<SegmentId> result;
     if (is_query) {

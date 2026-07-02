@@ -1,9 +1,9 @@
 #include "algorithms/line_segment_intersection.hpp"
 #include "algorithms/sweep_line.hpp"
+#include "debug/logging.hpp"
 #include "geometry/predicates.hpp"
 #include <climits>
 #include <cstddef>
-#include <iostream>
 #include <iterator>
 #include <map>
 #include <optional>
@@ -121,8 +121,8 @@ void SegmentIntersectionState::printElement(SegmentId id) {
     const ActiveSegment& key = segments_by_id[id];
     auto point = key.pointAtEvent(curr_event.point);
     if (point) {
-        std::cout << "#" << key.id << " " << key.segment.toString() << ": " << point->toString()
-                  << std::endl;
+        debug::segmentIntersection() << "#" << key.id << " " << key.segment.toString() << ": "
+                                     << point->toString() << std::endl;
     }
 }
 
@@ -152,9 +152,10 @@ void findNewEvent(const ActiveSegment& predecessor, const ActiveSegment& success
     }
 
     // Event queue only contains upper segments.
-#ifndef NDEBUG
-    std::cout << "Found new event: " << ls_intersect_point.point.toString() << std::endl;
-#endif
+    if (debug::segmentIntersectionEnabled()) {
+        debug::segmentIntersection()
+            << "Found new event: " << ls_intersect_point.point.toString() << std::endl;
+    }
 
     auto& event = line_sweep.event_queue.try_emplace(ls_intersect_point).first->second;
     event.witnesses.insert(successor.id);
@@ -193,14 +194,16 @@ void collectTouchingNeighbors(const EventPoint& ls_point, const ActiveSegment& s
 
         const Point& lower_endpoint = curr_segment.segment.start;
         if (lower_endpoint == ls_point.point) {
-#ifndef NDEBUG
-            std::cout << "Found lower segment " << curr_segment.segment.toString() << std::endl;
-#endif
+            if (debug::segmentIntersectionEnabled()) {
+                debug::segmentIntersection()
+                    << "Found lower segment " << curr_segment.segment.toString() << std::endl;
+            }
             lower_segments.push_back(curr_segment_id);
         } else if (isPointOnSegment(ls_point.point, curr_segment.segment)) {
-#ifndef NDEBUG
-            std::cout << "Found mid segment " << curr_segment.segment.toString() << std::endl;
-#endif
+            if (debug::segmentIntersectionEnabled()) {
+                debug::segmentIntersection()
+                    << "Found mid segment " << curr_segment.segment.toString() << std::endl;
+            }
             mid_segments.push_back(curr_segment_id);
         } else {
             break;
@@ -215,22 +218,22 @@ void collectTouchingNeighbors(const EventPoint& ls_point, const ActiveSegment& s
 /// \returns Segment IDs touching the event point.
 std::vector<SegmentId> handleEventPoint(EventPoint& ls_point, SegmentIntersectionEvent& event,
                                         SegmentIntersectionState& line_sweep) {
-#ifndef NDEBUG
-    std::cout << std::endl;
-    std::cout << "Event: " << ls_point.point.toString() << std::endl;
-#endif
+    if (debug::segmentIntersectionEnabled()) {
+        debug::segmentIntersection() << std::endl;
+        debug::segmentIntersection() << "Event: " << ls_point.point.toString() << std::endl;
+    }
 
     auto& curr_segments = line_sweep.curr_segments;
     const auto& segments_by_id = line_sweep.segments_by_id;
     const auto& upper_segments = event.upper_segments;
     std::vector<SegmentId> mid_segments;
     std::vector<SegmentId> lower_segments;
-#ifndef NDEBUG
-    std::cout << "Active segments before event:" << std::endl;
-    for (SegmentId id : curr_segments) {
-        line_sweep.printElement(id);
+    if (debug::segmentIntersectionEnabled()) {
+        debug::segmentIntersection() << "Active segments before event:" << std::endl;
+        for (SegmentId id : curr_segments) {
+            line_sweep.printElement(id);
+        }
     }
-#endif
 
     // Populate all segments touching the event point on the lower point or anywhere in
     // the middle. These are all adjacent in curr_segments, and we use a known probe
@@ -285,17 +288,17 @@ std::vector<SegmentId> handleEventPoint(EventPoint& ls_point, SegmentIntersectio
 
     for (SegmentId id : lower_segments) {
         const ActiveSegment& s = segments_by_id[id];
-#ifndef NDEBUG
-        std::cout << "Remove lower " << s.segment.toString() << std::endl;
-#endif
+        if (debug::segmentIntersectionEnabled()) {
+            debug::segmentIntersection() << "Remove lower " << s.segment.toString() << std::endl;
+        }
         [[maybe_unused]] size_t count = curr_segments.erase(id);
         assert(count == 1);
     }
     for (SegmentId id : mid_segments) {
         const ActiveSegment& s = segments_by_id[id];
-#ifndef NDEBUG
-        std::cout << "Remove mid " << s.segment.toString() << std::endl;
-#endif
+        if (debug::segmentIntersectionEnabled()) {
+            debug::segmentIntersection() << "Remove mid " << s.segment.toString() << std::endl;
+        }
         [[maybe_unused]] size_t count = curr_segments.erase(id);
         assert(count == 1);
     }
@@ -307,25 +310,25 @@ std::vector<SegmentId> handleEventPoint(EventPoint& ls_point, SegmentIntersectio
     // the correct order in curr_segments.
     for (SegmentId id : upper_segments) {
         const ActiveSegment& s = segments_by_id[id];
-#ifndef NDEBUG
-        std::cout << "Insert upper " << s.segment.toString() << std::endl;
-#endif
+        if (debug::segmentIntersectionEnabled()) {
+            debug::segmentIntersection() << "Insert upper " << s.segment.toString() << std::endl;
+        }
         curr_segments.insert(id);
     }
     for (SegmentId id : mid_segments) {
         const ActiveSegment& s = segments_by_id[id];
-#ifndef NDEBUG
-        std::cout << "Insert mid " << s.segment.toString() << std::endl;
-#endif
+        if (debug::segmentIntersectionEnabled()) {
+            debug::segmentIntersection() << "Insert mid " << s.segment.toString() << std::endl;
+        }
         curr_segments.insert(id);
     }
 
-#ifndef NDEBUG
-    std::cout << "Active segments after event:" << std::endl;
-    for (SegmentId id : curr_segments) {
-        line_sweep.printElement(id);
+    if (debug::segmentIntersectionEnabled()) {
+        debug::segmentIntersection() << "Active segments after event:" << std::endl;
+        for (SegmentId id : curr_segments) {
+            line_sweep.printElement(id);
+        }
     }
-#endif
 
     // Look for new events.
     if (upper_segments.empty() && mid_segments.empty()) {
@@ -408,9 +411,10 @@ void forEachLineSegmentIntersection(const std::vector<Segment>& segments,
             for (sweep::SegmentId id : touching_segments) {
                 original_touching_segments.push_back(original_ids[id]);
             }
-#ifndef NDEBUG
-            std::cout << "Intersection at " << p.point.toString() << std::endl;
-#endif
+            if (debug::segmentIntersectionEnabled()) {
+                debug::segmentIntersection()
+                    << "Intersection at " << p.point.toString() << std::endl;
+            }
             on_intersection(p.point, original_touching_segments);
         }
     }

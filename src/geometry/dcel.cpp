@@ -1,6 +1,7 @@
 #include "geometry/dcel.hpp"
 #include "algorithms/horizontal_ray_query.hpp"
 #include "algorithms/overlay.hpp"
+#include "debug/logging.hpp"
 #include "geometry/intersection.hpp"
 #include "geometry/polygon.hpp"
 #include "geometry/predicates.hpp"
@@ -9,9 +10,6 @@
 #include <cassert>
 #include <cfloat>
 #include <cstddef>
-#ifndef NDEBUG
-#include <iostream>
-#endif
 #include <optional>
 #include <queue>
 #include <stdexcept>
@@ -138,13 +136,11 @@ struct DCELBuilderRing {
         DCEL::npos; ///< Nearest left half-edge from leftmost point.
 };
 
-#ifndef NDEBUG
 void debugPrintHalfEdgeList(const std::vector<std::size_t>& half_edges) {
     for (std::size_t half_edge : half_edges) {
-        std::cerr << ' ' << half_edge;
+        debug::dcel() << ' ' << half_edge;
     }
 }
-#endif
 
 DCEL::FaceParity oppositeFaceParity(DCEL::FaceParity parity) {
     assert(parity != DCEL::FaceParity::Unknown);
@@ -155,7 +151,6 @@ DCEL::FaceParity oppositeFaceParity(DCEL::FaceParity parity) {
     return DCEL::FaceParity::Exterior;
 }
 
-#ifndef NDEBUG
 std::string faceParityName(DCEL::FaceParity parity) {
     switch (parity) {
     case DCEL::FaceParity::Unknown:
@@ -172,19 +167,19 @@ std::string faceParityName(DCEL::FaceParity parity) {
 void dumpFaceBoundary(const DCEL& dcel, std::size_t face_index) {
     const DCEL::Face& face = dcel.face(face_index);
     auto dump_component = [&](const char* label, std::size_t component) {
-        std::cerr << "  " << label << " component " << component << ":\n";
+        debug::dcel() << "  " << label << " component " << component << ":\n";
         if (component == DCEL::npos) {
-            std::cerr << "    <none>\n";
+            debug::dcel() << "    <none>\n";
             return;
         }
 
         std::size_t curr_half_edge = component;
         do {
             const DCEL::HalfEdge& half_edge = dcel.halfEdge(curr_half_edge);
-            std::cerr << "    edge " << curr_half_edge << " face=" << half_edge.face
-                      << " twin=" << half_edge.twin << " next=" << half_edge.next
-                      << " segment=" << dcel.segmentOf(half_edge).toString()
-                      << " boundary_count=" << half_edge.boundary_count << "\n";
+            debug::dcel() << " edge " << curr_half_edge << " face=" << half_edge.face
+                          << " twin=" << half_edge.twin << " next=" << half_edge.next
+                          << " segment=" << dcel.segmentOf(half_edge).toString()
+                          << " boundary_count=" << half_edge.boundary_count << "\n";
             curr_half_edge = half_edge.next;
         } while (curr_half_edge != component);
     };
@@ -200,22 +195,21 @@ void dumpFaceParityConflict(const DCEL& dcel, const std::vector<DCEL::FaceParity
                             std::size_t half_edge_index, DCEL::FaceParity expected_parity) {
     const DCEL::HalfEdge& half_edge = dcel.halfEdge(half_edge_index);
     const DCEL::HalfEdge& twin_half_edge = dcel.twinOf(half_edge);
-    std::cerr << "[dcel] face parity conflict\n";
-    std::cerr << "  current_face=" << face_index
-              << " parity=" << faceParityName(face_parities[face_index]) << "\n";
-    std::cerr << "  adjacent_face=" << adjacent_face
-              << " existing_parity=" << faceParityName(face_parities[adjacent_face])
-              << " expected_parity=" << faceParityName(expected_parity) << "\n";
-    std::cerr << "  crossing_edge=" << half_edge_index
-              << " segment=" << dcel.segmentOf(half_edge).toString() << "\n";
-    std::cerr << "  twin_edge=" << half_edge.twin
-              << " segment=" << dcel.segmentOf(twin_half_edge).toString() << "\n";
-    std::cerr << "  current face boundary:\n";
+    debug::dcel() << "[dcel] face parity conflict\n";
+    debug::dcel() << "  current_face=" << face_index
+                  << " parity=" << faceParityName(face_parities[face_index]) << "\n";
+    debug::dcel() << "  adjacent_face=" << adjacent_face
+                  << " existing_parity=" << faceParityName(face_parities[adjacent_face])
+                  << " expected_parity=" << faceParityName(expected_parity) << "\n";
+    debug::dcel() << "  crossing_edge=" << half_edge_index
+                  << " segment=" << dcel.segmentOf(half_edge).toString() << "\n";
+    debug::dcel() << "  twin_edge=" << half_edge.twin
+                  << " segment=" << dcel.segmentOf(twin_half_edge).toString() << "\n";
+    debug::dcel() << "  current face boundary:\n";
     dumpFaceBoundary(dcel, face_index);
-    std::cerr << "  adjacent face boundary:\n";
+    debug::dcel() << "  adjacent face boundary:\n";
     dumpFaceBoundary(dcel, adjacent_face);
 }
-#endif
 
 } // namespace
 
@@ -368,10 +362,10 @@ void DCEL::Creator::sortOutgoingHalfEdges(OutgoingHalfEdges& outgoing_half_edges
 }
 
 void DCEL::Creator::linkHalfEdges(const OutgoingHalfEdges& outgoing_half_edges) {
-#ifndef NDEBUG
-    std::cerr << "[dcel] linkHalfEdges: half_edges=" << dcel.half_edges.size()
-              << " vertices=" << outgoing_half_edges.size() << '\n';
-#endif
+    if (debug::dcelEnabled()) {
+        debug::dcel() << "[dcel] linkHalfEdges: half_edges=" << dcel.half_edges.size()
+                      << " vertices=" << outgoing_half_edges.size() << '\n';
+    }
 
     for (std::size_t edge = 0; edge < dcel.half_edges.size(); edge++) {
         std::size_t twin = dcel.half_edges[edge].twin;
@@ -391,19 +385,19 @@ void DCEL::Creator::linkHalfEdges(const OutgoingHalfEdges& outgoing_half_edges) 
         dcel.half_edges[edge].next = next;
         dcel.half_edges[next].prev = edge;
 
-#ifndef NDEBUG
-        std::cerr << "[dcel]   edge " << edge << " "
-                  << dcel.segmentOf(dcel.half_edges[edge]).toString() << " twin=" << twin
-                  << " dest_vertex=" << twin_origin << " incoming_slot=" << i
-                  << " next_slot=" << next_i << " next=" << next << '\n';
-#endif
+        if (debug::dcelEnabled()) {
+            debug::dcel() << "[dcel]   edge " << edge << " "
+                          << dcel.segmentOf(dcel.half_edges[edge]).toString() << " twin=" << twin
+                          << " dest_vertex=" << twin_origin << " incoming_slot=" << i
+                          << " next_slot=" << next_i << " next=" << next << '\n';
+        }
     }
 }
 
 void DCEL::Creator::assembleBoundaryRings() {
-#ifndef NDEBUG
-    std::cerr << "[dcel] assembleBoundaryRings\n";
-#endif
+    if (debug::dcelEnabled()) {
+        debug::dcel() << "[dcel] assembleBoundaryRings\n";
+    }
 
     std::unordered_set<std::size_t> visited;
 
@@ -423,10 +417,10 @@ void DCEL::Creator::assembleBoundaryRings() {
             visited.insert(curr_edge);
             curr_ring_edges.push_back(curr_edge);
 
-#ifndef NDEBUG
-            std::cerr << "[dcel]   walk edge " << curr_edge << " -> "
-                      << dcel.halfEdge(curr_edge).next << '\n';
-#endif
+            if (debug::dcelEnabled()) {
+                debug::dcel() << "[dcel]   walk edge " << curr_edge << " -> "
+                              << dcel.halfEdge(curr_edge).next << '\n';
+            }
 
             curr_edge = dcel.halfEdge(curr_edge).next;
         } while (curr_edge != first_edge);
@@ -513,9 +507,9 @@ std::size_t DCEL::Creator::findNearestHalfEdgeToLeft(const Point& point) {
 }
 
 void DCEL::Creator::createFaces() {
-#ifndef NDEBUG
-    std::cerr << "[dcel] createFaces: rings=" << boundary_rings.size() << '\n';
-#endif
+    if (debug::dcelEnabled()) {
+        debug::dcel() << "[dcel] createFaces: rings=" << boundary_rings.size() << '\n';
+    }
 
     const std::size_t unbounded_ring_index = ring_union_find.addSet();
 
@@ -529,23 +523,23 @@ void DCEL::Creator::createFaces() {
         const std::size_t root_ring_index = ring_union_find.find(ring_index);
         const std::size_t face_index = getOrCreateFace(root_ring_index, root_ring_to_face);
 
-#ifndef NDEBUG
-        std::cerr << "[dcel]   assign ring " << ring_index << " root=" << root_ring_index
-                  << " face=" << face_index << '\n';
-#endif
+        if (debug::dcelEnabled()) {
+            debug::dcel() << "[dcel]   assign ring " << ring_index << " root=" << root_ring_index
+                          << " face=" << face_index << '\n';
+        }
 
         addBoundaryRingToFace(boundary_ring, face_index);
     }
 
-#ifndef NDEBUG
-    for (std::size_t face_index = 0; face_index < dcel.faces.size(); ++face_index) {
-        const DCEL::Face& face = dcel.faces[face_index];
-        std::cerr << "[dcel]   face " << face_index << " outer=" << face.outer_component
-                  << " inners=";
-        debugPrintHalfEdgeList(face.inner_components);
-        std::cerr << '\n';
+    if (debug::dcelEnabled()) {
+        for (std::size_t face_index = 0; face_index < dcel.faces.size(); ++face_index) {
+            const DCEL::Face& face = dcel.faces[face_index];
+            debug::dcel() << "[dcel]   face " << face_index << " outer=" << face.outer_component
+                          << " inners=";
+            debugPrintHalfEdgeList(face.inner_components);
+            debug::dcel() << '\n';
+        }
     }
-#endif
 }
 
 void DCEL::Creator::groupBoundaryRingsByFace(const std::size_t unbounded_ring_index) {
@@ -676,16 +670,16 @@ void DCEL::Creator::addBoundaryRingToFace(const DCELBuilderRing& boundary_ring,
     if (isOuter(boundary_ring)) {
         assert(dcel.faces[face_index].outer_component == DCEL::npos);
         dcel.faces[face_index].outer_component = half_edge_index;
-#ifndef NDEBUG
-        std::cerr << "[dcel]     face " << face_index << " outer_component=" << half_edge_index
-                  << '\n';
-#endif
+        if (debug::dcelEnabled()) {
+            debug::dcel() << "[dcel]     face " << face_index
+                          << " outer_component=" << half_edge_index << '\n';
+        }
     } else {
         dcel.faces[face_index].inner_components.push_back(half_edge_index);
-#ifndef NDEBUG
-        std::cerr << "[dcel]     face " << face_index << " inner_component=" << half_edge_index
-                  << '\n';
-#endif
+        if (debug::dcelEnabled()) {
+            debug::dcel() << "[dcel]     face " << face_index
+                          << " inner_component=" << half_edge_index << '\n';
+        }
     }
 }
 
@@ -747,16 +741,16 @@ void DCEL::Creator::addBoundaryRing(const std::vector<std::size_t>& half_edge_in
         half_edges[ring_half_edge_index].boundary_ring = ring_index;
     }
 
-#ifndef NDEBUG
-    const LinearRing ring = linearRingOf(boundary_rings[ring_index]);
-    std::cerr << "[dcel]   ring " << ring_index << " edges=";
-    debugPrintHalfEdgeList(half_edge_indices);
-    std::cerr << " area=" << ring.signedArea() << " outer=" << ring.isOuter() << " points=";
-    for (const Point& point : ring.points) {
-        std::cerr << ' ' << point.toString();
+    if (debug::dcelEnabled()) {
+        const LinearRing ring = linearRingOf(boundary_rings[ring_index]);
+        debug::dcel() << "[dcel]   ring " << ring_index << " edges=";
+        debugPrintHalfEdgeList(half_edge_indices);
+        debug::dcel() << " area=" << ring.signedArea() << " outer=" << ring.isOuter() << " points=";
+        for (const Point& point : ring.points) {
+            debug::dcel() << ' ' << point.toString();
+        }
+        debug::dcel() << '\n';
     }
-    std::cerr << '\n';
-#endif
 }
 
 LinearRing DCEL::Creator::linearRingOf(const DCELBuilderRing& boundary_ring) const {
@@ -987,12 +981,11 @@ std::vector<DCEL::FaceParity> DCEL::faceParities() const {
                         face_parities[adjacent_face] = adjacent_parity;
                         queue.push(adjacent_face);
                     } else {
-#ifndef NDEBUG
-                        if (face_parities[adjacent_face] != adjacent_parity) {
+                        if (face_parities[adjacent_face] != adjacent_parity &&
+                            debug::dcelEnabled()) {
                             dumpFaceParityConflict(*this, face_parities, face_index, adjacent_face,
                                                    curr_half_edge, adjacent_parity);
                         }
-#endif
                         assert(face_parities[adjacent_face] == adjacent_parity);
                     }
 
