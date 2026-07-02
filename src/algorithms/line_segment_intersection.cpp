@@ -1,4 +1,5 @@
 #include "algorithms/line_segment_intersection.hpp"
+#include "algorithms/sweep_line.hpp"
 #include "geometry/predicates.hpp"
 #include <climits>
 #include <cstddef>
@@ -7,7 +8,6 @@
 #include <map>
 #include <optional>
 #include <set>
-#include <stdexcept>
 #include <unordered_set>
 #include <vector>
 
@@ -53,95 +53,28 @@
  * collinear overlaps.
  */
 
-namespace sweep {
+namespace {
 
-using SegmentId = std::size_t;
-
-/// \brief Event point wrapper ordered in sweep processing order.
-class EventPoint {
-  public:
-    Point point; ///< The geometric point represented by this sweep event.
-
-    /// \brief Wrap a point with the event-queue ordering used by the sweep.
-    /// \param point The geometric point represented by this event.
-    EventPoint(const Point& point);
-
-    /// \brief Check whether two event points refer to the same geometric point.
-    /// \param other The event point to compare against.
-    /// \returns True when both event points contain the same point.
-    bool operator==(const EventPoint& other) const;
-
-    /// \brief Order events from top to bottom, breaking ties from left to right.
-    /// \param other The event point to compare against.
-    /// \returns True if this event should be processed before the other event.
-    bool operator<(const EventPoint& other) const;
-
-    /// \brief Check whether this event is at or before another event in sweep order.
-    /// \param other The event point to compare against.
-    /// \returns True if this event is ordered before or equal to the other event.
-    bool operator<=(const EventPoint& other) const {
-        return *this < other || *this == other;
-    }
-};
-
-class State;
-
-/// \brief Segment wrapper with sweep-state-dependent cached ordering data.
-class ActiveSegment {
-  public:
-    SegmentId id;               ///< The original input segment index.
-    Segment segment;            ///< The canonicalized segment represented by this ID.
-    Rational slope_inverse;     ///< The finite inverse slope used for tie-breaking.
-    int slope_inverse_infinity; ///< Direction marker for horizontal segment ordering.
-    mutable std::optional<Point> cached_event; ///< The event point for the cached intersection.
-    mutable std::optional<Point> cached_point_at_event; ///< Cached intersection at curr_event.
-
-    /// \brief Wrap a segment with sweep-specific cached data.
-    /// \param id The original input segment index.
-    /// \param segment The segment represented in the active set.
-    ActiveSegment(SegmentId id, const Segment& segment);
-
-    /// \brief Return this segment's intersection with the sweep line through an event.
-    /// \param event_point The event point whose horizontal sweep line is being evaluated.
-    /// \returns The point where the segment meets the current event's horizontal line.
-    std::optional<Point> pointAtEvent(const Point& event_point) const;
-
-    /// \brief Check whether two active segments represent the same sweep segment by checking id.
-    /// \param other The active segment to compare against.
-    /// \returns True if both have the same id.
-    bool operator==(const ActiveSegment& other) const;
-};
-
-/// \brief Compare active segments at the current sweep event.
-struct ActiveSegmentCompare {
-    const State* line_sweep; ///< The sweep-line state used to resolve segment IDs.
-
-    /// \brief Initialize a comparator for one sweep-line state.
-    /// \param line_sweep The state containing segment geometry and the current event.
-    explicit ActiveSegmentCompare(const State* line_sweep);
-
-    /// \brief Order active segments at the current sweep event.
-    /// \param a_id The first active segment ID.
-    /// \param b_id The second active segment ID.
-    /// \returns True if a_id should appear before b_id in the active set.
-    bool operator()(SegmentId a_id, SegmentId b_id) const;
-};
+using sweep::ActiveSegment;
+using sweep::ActiveSegmentCompare;
+using sweep::EventPoint;
+using sweep::SegmentId;
 
 /// \brief Event-queue payload for one geometric event point.
-class Event {
+class SegmentIntersectionEvent {
   public:
     std::vector<SegmentId> upper_segments;   ///< Segments whose upper endpoint is this event.
     std::unordered_set<SegmentId> witnesses; ///< Segments that imply this event.
 
     /// \brief Store segments that start at an event and segments witnessing the event.
-    Event();
+    SegmentIntersectionEvent();
 };
 
 /// \brief Mutable Bentley-Ottmann sweep-line state.
-class State {
+class SegmentIntersectionState {
   public:
     mutable EventPoint curr_event; ///< The event point currently used for active-set ordering.
-    std::map<EventPoint, Event> event_queue; ///< Pending events ordered in sweep order.
+    std::map<EventPoint, SegmentIntersectionEvent> event_queue; ///< Pending intersection events.
     /// \brief Active segments ordered by curr_event.
     ///
     /// Remove affected segments before moving curr_event, then insert/reinsert segments
@@ -150,7 +83,7 @@ class State {
     std::set<SegmentId, ActiveSegmentCompare> curr_segments;
 
     /// \brief Initialize the sweep-line state and active/event containers.
-    State();
+    SegmentIntersectionState();
 
     /// \brief Seed the event queue with segment endpoint events.
     /// \param segments The input segments to add to the sweep.
@@ -161,31 +94,11 @@ class State {
     void printElement(SegmentId id);
 };
 
-/// \brief Compare the inverse slopes of two active segments.
-/// \param a The first active segment.
-/// \param b The second active segment.
-/// \returns -1 if a's inverse slope is smaller, 1 if larger, or 0 if equal.
-int compareSlopeInverse(const ActiveSegment& a, const ActiveSegment& b) {
-    if (a.slope_inverse_infinity != b.slope_inverse_infinity) {
-        return a.slope_inverse_infinity < b.slope_inverse_infinity ? -1 : 1;
-    }
-    if (a.slope_inverse_infinity != 0) {
-        return 0;
-    }
-    if (a.slope_inverse < b.slope_inverse) {
-        return -1;
-    }
-    if (b.slope_inverse < a.slope_inverse) {
-        return 1;
-    }
-    return 0;
-}
-
-State::State()
+SegmentIntersectionState::SegmentIntersectionState()
     : curr_event(EventPoint(Point(INT_MAX, INT_MAX))), segments_by_id(),
-      curr_segments(ActiveSegmentCompare(this)) {}
+      curr_segments(ActiveSegmentCompare(&curr_event, &segments_by_id)) {}
 
-void State::populateEventQueue(const std::vector<Segment>& segments) {
+void SegmentIntersectionState::populateEventQueue(const std::vector<Segment>& segments) {
     // Insert segment's upper endpoints into the event queue, and keep track of which
     // segments they belong to.
     segments_by_id.reserve(segments.size());
@@ -204,7 +117,7 @@ void State::populateEventQueue(const std::vector<Segment>& segments) {
     }
 }
 
-void State::printElement(SegmentId id) {
+void SegmentIntersectionState::printElement(SegmentId id) {
     const ActiveSegment& key = segments_by_id[id];
     auto point = key.pointAtEvent(curr_event.point);
     if (point) {
@@ -213,86 +126,7 @@ void State::printElement(SegmentId id) {
     }
 }
 
-ActiveSegment::ActiveSegment(SegmentId id, const Segment& segment)
-    : id(id), segment(segment), slope_inverse(0), slope_inverse_infinity(0), cached_event(),
-      cached_point_at_event() {
-    Rational dx = segment.start.x - segment.end.x;
-    Rational dy = segment.start.y - segment.end.y;
-    if (dy != 0) {
-        slope_inverse = dx / -dy;
-        slope_inverse_infinity = 0;
-    } else {
-        slope_inverse_infinity = (dx >= 0) ? 1 : -1;
-    }
-}
-
-std::optional<Point> ActiveSegment::pointAtEvent(const Point& event_point) const {
-    if (cached_event && *cached_event == event_point) {
-        return cached_point_at_event;
-    }
-    auto point_at_y = intersectAtY(segment, event_point);
-    cached_event = event_point;
-    cached_point_at_event = point_at_y;
-    return point_at_y;
-}
-
-bool ActiveSegment::operator==(const ActiveSegment& other) const {
-    return id == other.id;
-}
-
-ActiveSegmentCompare::ActiveSegmentCompare(const State* line_sweep) : line_sweep(line_sweep) {}
-
-bool ActiveSegmentCompare::operator()(SegmentId a_id, SegmentId b_id) const {
-    const ActiveSegment& a = line_sweep->segments_by_id[a_id];
-    const ActiveSegment& b = line_sweep->segments_by_id[b_id];
-    const Point& event_point = line_sweep->curr_event.point;
-    auto point_at_y = a.pointAtEvent(event_point);
-    auto other_point_at_y = b.pointAtEvent(event_point);
-
-    if (!point_at_y || !other_point_at_y) {
-        throw std::runtime_error(
-            "Failed to compute intersection point for active segment comparison");
-    }
-
-    if (*point_at_y == *other_point_at_y) {
-        int slope_cmp = compareSlopeInverse(a, b);
-
-        if (slope_cmp == 0) {
-            if (a.segment == b.segment) {
-                return a.id < b.id;
-            }
-            return a.segment < b.segment;
-        }
-
-        // Before and including the current event, the segments are ordered in the
-        // order just below curr_event.point.y. If the intersection is after the
-        // current event, then it hasn't been processed yet, and they are ordered in
-        // the order just above curr_event.point.y.
-        if (point_at_y->x <= event_point.x) {
-            return slope_cmp < 0;
-        } else {
-            return slope_cmp > 0;
-        }
-    }
-
-    bool ans = *point_at_y < *other_point_at_y;
-    return ans;
-}
-
-EventPoint::EventPoint(const Point& point) : point(point) {}
-
-bool EventPoint::operator==(const EventPoint& other) const {
-    return point == other.point;
-}
-
-bool EventPoint::operator<(const EventPoint& other) const {
-    if (point.y == other.point.y) {
-        return point.x < other.point.x;
-    }
-    return point.y > other.point.y;
-}
-
-Event::Event() : upper_segments(), witnesses() {}
+SegmentIntersectionEvent::SegmentIntersectionEvent() : upper_segments(), witnesses() {}
 
 /// \brief Insert a future intersection event for adjacent active segments when one exists.
 /// \param predecessor One active segment adjacent to the candidate event.
@@ -300,7 +134,7 @@ Event::Event() : upper_segments(), witnesses() {}
 /// \param ls_point The current event point.
 /// \param line_sweep The sweep-line state to update.
 void findNewEvent(const ActiveSegment& predecessor, const ActiveSegment& successor,
-                  const EventPoint& ls_point, State& line_sweep) {
+                  const EventPoint& ls_point, SegmentIntersectionState& line_sweep) {
     std::optional<Point> intersect_point =
         intersectionPoint(predecessor.segment, successor.segment);
     if (!intersect_point)
@@ -334,7 +168,8 @@ void findNewEvent(const ActiveSegment& predecessor, const ActiveSegment& success
 /// \param lower_segments Segments whose lower endpoint is this event.
 /// \param find_succ True to walk successors, false to walk predecessors.
 void collectTouchingNeighbors(const EventPoint& ls_point, const ActiveSegment& seed,
-                              const State& line_sweep, std::vector<SegmentId>& mid_segments,
+                              const SegmentIntersectionState& line_sweep,
+                              std::vector<SegmentId>& mid_segments,
                               std::vector<SegmentId>& lower_segments, bool find_succ) {
     const auto& curr_segments = line_sweep.curr_segments;
     const auto& segments_by_id = line_sweep.segments_by_id;
@@ -378,7 +213,8 @@ void collectTouchingNeighbors(const EventPoint& ls_point, const ActiveSegment& s
 /// \param event The event data associated with the point.
 /// \param line_sweep The sweep-line state to update.
 /// \returns Segment IDs touching the event point.
-std::vector<SegmentId> handleEventPoint(EventPoint& ls_point, Event& event, State& line_sweep) {
+std::vector<SegmentId> handleEventPoint(EventPoint& ls_point, SegmentIntersectionEvent& event,
+                                        SegmentIntersectionState& line_sweep) {
 #ifndef NDEBUG
     std::cout << std::endl;
     std::cout << "Event: " << ls_point.point.toString() << std::endl;
@@ -539,7 +375,7 @@ std::vector<SegmentId> handleEventPoint(EventPoint& ls_point, Event& event, Stat
     return touching_segments;
 }
 
-} // namespace sweep
+} // namespace
 
 template <typename IntersectionCallback>
 void forEachLineSegmentIntersection(const std::vector<Segment>& segments,
@@ -556,16 +392,16 @@ void forEachLineSegmentIntersection(const std::vector<Segment>& segments,
         non_degenerate_segments.push_back(segments[id]);
     }
 
-    sweep::State ls;
+    SegmentIntersectionState ls;
     ls.populateEventQueue(non_degenerate_segments);
 
     while (!ls.event_queue.empty()) {
         auto it = ls.event_queue.begin();
         sweep::EventPoint p = it->first;
-        sweep::Event e = std::move(it->second);
+        SegmentIntersectionEvent e = std::move(it->second);
         ls.event_queue.erase(it);
 
-        std::vector<sweep::SegmentId> touching_segments = sweep::handleEventPoint(p, e, ls);
+        std::vector<sweep::SegmentId> touching_segments = handleEventPoint(p, e, ls);
         if (touching_segments.size() > 1) {
             std::vector<sweep::SegmentId> original_touching_segments;
             original_touching_segments.reserve(touching_segments.size());

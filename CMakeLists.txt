@@ -69,8 +69,10 @@ add_library(
     src/geometry/dcel.cpp
     src/algorithms/assemble.cpp
     src/algorithms/convex_hull.cpp
+    src/algorithms/horizontal_ray_query.cpp
     src/algorithms/line_segment_intersection.cpp
     src/algorithms/overlay.cpp
+    src/algorithms/sweep_line.cpp
     src/io/document.cpp
     src/io/geometry_io.cpp
 )

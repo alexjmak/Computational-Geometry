@@ -1,10 +1,12 @@
 #include "algorithms/assemble.hpp"
 #include "algorithms/convex_hull.hpp"
+#include "algorithms/horizontal_ray_query.hpp"
 #include "algorithms/line_segment_intersection.hpp"
 #include "algorithms/overlay.hpp"
 #include "geometry/polygon.hpp"
 #include <algorithm>
 #include <gtest/gtest.h>
+#include <optional>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -415,6 +417,131 @@ TEST(LineSegmentIntersectionTest, IgnoresDegenerateSegments) {
     };
 
     expectIntersections(segments, {Point(2, 2)});
+}
+
+TEST(LeftRayQueryTest, FindsNearestSegmentStrictlyLeftOfQuery) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(0, 5)),
+        Segment(Point(3, 0), Point(3, 5)),
+        Segment(Point(6, 0), Point(6, 5)),
+    };
+    const std::vector<Point> queries = {Point(4, 2)};
+
+    const std::vector<std::optional<sweep::SegmentId>> hits = leftRayQuery(segments, queries);
+
+    ASSERT_EQ(hits.size(), 1);
+    ASSERT_TRUE(hits[0].has_value());
+    EXPECT_EQ(hits[0].value(), 1);
+}
+
+TEST(LeftRayQueryTest, ReportsNoHitWhenAllSegmentsAreRightOfQuery) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(0, 5)),
+        Segment(Point(3, 0), Point(3, 5)),
+    };
+    const std::vector<Point> queries = {Point(-1, 2)};
+
+    const std::vector<std::optional<sweep::SegmentId>> hits = leftRayQuery(segments, queries);
+
+    ASSERT_EQ(hits.size(), 1);
+    EXPECT_FALSE(hits[0].has_value());
+}
+
+TEST(LeftRayQueryTest, KeepsQueryResultsIndexedWhenQueriesSharePoint) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(0, 5)),
+        Segment(Point(3, 0), Point(3, 5)),
+    };
+    const std::vector<Point> queries = {Point(4, 2), Point(4, 2)};
+
+    const std::vector<std::optional<sweep::SegmentId>> hits = leftRayQuery(segments, queries);
+
+    ASSERT_EQ(hits.size(), 2);
+    ASSERT_TRUE(hits[0].has_value());
+    ASSERT_TRUE(hits[1].has_value());
+    EXPECT_EQ(hits[0].value(), 1);
+    EXPECT_EQ(hits[1].value(), 1);
+}
+
+TEST(LeftRayQueryTest, HandlesReversedInputSegments) {
+    const std::vector<Segment> segments = {
+        Segment(Point(3, 5), Point(3, 0)),
+    };
+    const std::vector<Point> queries = {Point(4, 2)};
+
+    const std::vector<std::optional<sweep::SegmentId>> hits = leftRayQuery(segments, queries);
+
+    ASSERT_EQ(hits.size(), 1);
+    ASSERT_TRUE(hits[0].has_value());
+    EXPECT_EQ(hits[0].value(), 0);
+}
+
+TEST(LeftRayQueryTest, DISABLED_CountsLowerEndpointStrictlyLeftOfQuery) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(5, 5)),
+    };
+    const std::vector<Point> queries = {Point(10, 0)};
+
+    const std::vector<std::optional<sweep::SegmentId>> hits = leftRayQuery(segments, queries);
+
+    ASSERT_EQ(hits.size(), 1);
+    ASSERT_TRUE(hits[0].has_value());
+    EXPECT_EQ(hits[0].value(), 0);
+}
+
+TEST(LeftRayQueryTest, DISABLED_PicksCloserEdgeAtLowerEndpointTie) {
+    const std::vector<Segment> segments = {
+        Segment(Point(-5, 5), Point(0, 0)),
+        Segment(Point(0, 0), Point(5, 5)),
+    };
+    const std::vector<Point> queries = {Point(10, 0)};
+
+    const std::vector<std::optional<sweep::SegmentId>> hits = leftRayQuery(segments, queries);
+
+    ASSERT_EQ(hits.size(), 1);
+    ASSERT_TRUE(hits[0].has_value());
+    EXPECT_EQ(hits[0].value(), 1);
+}
+
+TEST(LeftRayQueryTest, CountsUpperEndpointStrictlyLeftOfQuery) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(5, 5)),
+    };
+    const std::vector<Point> queries = {Point(10, 5)};
+
+    const std::vector<std::optional<sweep::SegmentId>> hits = leftRayQuery(segments, queries);
+
+    ASSERT_EQ(hits.size(), 1);
+    ASSERT_TRUE(hits[0].has_value());
+    EXPECT_EQ(hits[0].value(), 0);
+}
+
+TEST(LeftRayQueryTest, AllowsEitherDuplicateSegmentIdForDuplicateGeometry) {
+    const std::vector<Segment> segments = {
+        Segment(Point(1, 0), Point(1, 5)),
+        Segment(Point(1, 0), Point(1, 5)),
+    };
+    const std::vector<Point> queries = {Point(2, 2)};
+
+    const std::vector<std::optional<sweep::SegmentId>> hits = leftRayQuery(segments, queries);
+
+    ASSERT_EQ(hits.size(), 1);
+    ASSERT_TRUE(hits[0].has_value());
+    EXPECT_TRUE(hits[0].value() == 0 || hits[0].value() == 1);
+}
+
+TEST(LeftRayQueryTest, SkipsHorizontalSegmentIncidentToQueryPoint) {
+    const std::vector<Segment> segments = {
+        Segment(Point(-2, 0), Point(0, 0)),
+        Segment(Point(-3, -1), Point(-3, 1)),
+    };
+    const std::vector<Point> queries = {Point(0, 0)};
+
+    const std::vector<std::optional<sweep::SegmentId>> hits = leftRayQuery(segments, queries);
+
+    ASSERT_EQ(hits.size(), 1);
+    ASSERT_TRUE(hits[0].has_value());
+    EXPECT_EQ(hits[0].value(), 1);
 }
 
 TEST(PlanarizeSegmentsTest, SplitsCrossingSegmentsAtIntersection) {

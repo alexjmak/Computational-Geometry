@@ -1,4 +1,5 @@
 #include "geometry/dcel.hpp"
+#include "algorithms/horizontal_ray_query.hpp"
 #include "algorithms/overlay.hpp"
 #include "geometry/intersection.hpp"
 #include "geometry/polygon.hpp"
@@ -133,6 +134,8 @@ struct DCELBuilderHalfEdge {
 /// \brief Builder metadata for one directed DCEL boundary ring.
 struct DCELBuilderRing {
     std::vector<std::size_t> half_edges; ///< Ordered half-edge indices around the ring.
+    std::size_t nearest_left_half_edge =
+        DCEL::npos; ///< Nearest left half-edge from leftmost point.
 };
 
 #ifndef NDEBUG
@@ -277,6 +280,9 @@ class DCEL::Creator {
     /// \brief Union boundary rings that bound the same face.
     /// \param unbounded_ring_index The union-find node for the imaginary unbounded boundary.
     void groupBoundaryRingsByFace(std::size_t unbounded_ring_index);
+
+    /// \brief Compute the nearest half-edge left of the leftmost edge of inner boundary rings.
+    void computeNearestLeftEdges();
 
     /// \brief Create the initial mapping from ring roots to face indices.
     /// \param unbounded_ring_index The union-find node for the imaginary unbounded boundary.
@@ -543,6 +549,8 @@ void DCEL::Creator::createFaces() {
 }
 
 void DCEL::Creator::groupBoundaryRingsByFace(const std::size_t unbounded_ring_index) {
+    computeNearestLeftEdges();
+
     // There is an arc between two rings if and only if one of the rings is the boundary of a hole
     // and the other ring has a half-edge immediately to the left of the leftmost vertex of that
     // hole ring.
@@ -552,28 +560,80 @@ void DCEL::Creator::groupBoundaryRingsByFace(const std::size_t unbounded_ring_in
             continue;
         }
 
-        std::size_t leftmost_half_edge_index = leftmostHalfEdge(boundary_ring.half_edges);
-        const DCEL::HalfEdge& leftmost_half_edge = dcel.half_edges[leftmost_half_edge_index];
-        const Point& leftmost_point = dcel.originOf(leftmost_half_edge);
-        std::size_t nearest_left_half_edge = findNearestHalfEdgeToLeft(leftmost_point);
+        std::size_t nearest_left_half_edge = boundary_ring.nearest_left_half_edge;
 
         if (nearest_left_half_edge == DCEL::npos) {
-#ifndef NDEBUG
-            std::cerr << "[dcel]   group ring " << ring_index
-                      << " with unbounded face: leftmost=" << leftmost_point.toString() << '\n';
-#endif
             ring_union_find.unite(ring_index, unbounded_ring_index);
         } else {
             std::size_t nearest_left_ring = half_edges[nearest_left_half_edge].boundary_ring;
             assert(nearest_left_ring != DCEL::npos);
             assert(nearest_left_ring != ring_index);
-#ifndef NDEBUG
-            std::cerr << "[dcel]   group ring " << ring_index << " with ring " << nearest_left_ring
-                      << ": leftmost=" << leftmost_point.toString()
-                      << " nearest_left_edge=" << nearest_left_half_edge << ' '
-                      << dcel.segmentOf(dcel.half_edges[nearest_left_half_edge]).toString() << '\n';
-#endif
             ring_union_find.unite(ring_index, nearest_left_ring);
+        }
+    }
+}
+
+void DCEL::Creator::computeNearestLeftEdges() {
+    std::vector<Segment> sweep_segments;
+    std::vector<std::size_t> half_edge_by_sweep_segment;
+    sweep_segments.reserve(dcel.half_edges.size() / 2);
+    half_edge_by_sweep_segment.reserve(dcel.half_edges.size() / 2);
+
+    for (std::size_t half_edge_index = 0; half_edge_index < dcel.half_edges.size();
+         ++half_edge_index) {
+        const DCEL::HalfEdge& half_edge = dcel.half_edges[half_edge_index];
+        if (half_edge_index > half_edge.twin) {
+            continue;
+        }
+
+        sweep_segments.push_back(dcel.segmentOf(half_edge));
+        half_edge_by_sweep_segment.push_back(half_edge_index);
+    }
+
+    std::vector<Point> queries;
+    std::vector<std::size_t> ring_by_query;
+    queries.reserve(boundary_rings.size());
+    ring_by_query.reserve(boundary_rings.size());
+
+    for (std::size_t ring_index = 0; ring_index < boundary_rings.size(); ++ring_index) {
+        DCELBuilderRing& boundary_ring = boundary_rings[ring_index];
+        boundary_ring.nearest_left_half_edge = DCEL::npos;
+
+        if (isOuter(boundary_ring)) {
+            continue;
+        }
+
+        const std::size_t leftmost_half_edge_index = leftmostHalfEdge(boundary_ring.half_edges);
+        const DCEL::HalfEdge& leftmost_half_edge = dcel.half_edges[leftmost_half_edge_index];
+        queries.push_back(dcel.originOf(leftmost_half_edge));
+        ring_by_query.push_back(ring_index);
+    }
+
+    const std::vector<std::optional<sweep::SegmentId>> hits = leftRayQuery(sweep_segments, queries);
+    assert(hits.size() == queries.size());
+
+    for (std::size_t query_index = 0; query_index < hits.size(); ++query_index) {
+        if (!hits[query_index].has_value()) {
+            continue;
+        }
+
+        const std::size_t nearest_half_edge_index =
+            half_edge_by_sweep_segment[hits[query_index].value()];
+        const DCEL::HalfEdge& nearest_half_edge = dcel.half_edges[nearest_half_edge_index];
+        const Segment nearest_segment = dcel.segmentOf(nearest_half_edge);
+        const Rational point_orientation =
+            orientation(nearest_segment.start, nearest_segment.end, queries[query_index]);
+
+        assert(point_orientation != 0);
+
+        // Want to pick the half-edge whose incident face is on the same side as the query point.
+        // So, the query point should be on the left side of the half-edge segment.
+        if (point_orientation > 0) {
+            boundary_rings[ring_by_query[query_index]].nearest_left_half_edge =
+                nearest_half_edge_index;
+        } else {
+            boundary_rings[ring_by_query[query_index]].nearest_left_half_edge =
+                nearest_half_edge.twin;
         }
     }
 }
@@ -608,7 +668,6 @@ DCEL::Creator::getOrCreateFace(const std::size_t root_ring_index,
 
 void DCEL::Creator::addBoundaryRingToFace(const DCELBuilderRing& boundary_ring,
                                           const std::size_t face_index) {
-
     // Assign this face to every half-edge around the boundary component.
     assignFaceToBoundaryRing(boundary_ring, face_index);
 
