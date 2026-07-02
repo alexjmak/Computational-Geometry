@@ -258,9 +258,10 @@ add_custom_target(
 if(DOXYGEN_FOUND)
     add_custom_target(
         docs
+        COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_SOURCE_DIR}/docs
         COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_SOURCE_DIR}/Doxyfile
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        COMMENT "Generating Doxygen documentation"
+        COMMENT "Cleaning and generating Doxygen documentation"
         VERBATIM
     )
 endif()
