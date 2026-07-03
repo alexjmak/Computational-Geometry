@@ -61,8 +61,10 @@ int compareSlopeInverse(const ActiveSegment& a, const ActiveSegment& b) {
 }
 
 ActiveSegmentCompare::ActiveSegmentCompare(const EventPoint* curr_event,
-                                           const std::vector<ActiveSegment>* segments_by_id)
-    : curr_event(curr_event), segments_by_id(segments_by_id) {}
+                                           const std::vector<ActiveSegment>* segments_by_id,
+                                           const bool use_canonical_tie_order)
+    : curr_event(curr_event), segments_by_id(segments_by_id),
+      use_canonical_tie_order(use_canonical_tie_order) {}
 
 bool ActiveSegmentCompare::operator()(SegmentId a_id, SegmentId b_id) const {
     const ActiveSegment& a = (*segments_by_id)[a_id];
@@ -79,7 +81,7 @@ bool ActiveSegmentCompare::operator()(SegmentId a_id, SegmentId b_id) const {
     if (*point_at_y == *other_point_at_y) {
         int slope_cmp = compareSlopeInverse(a, b);
 
-        if (slope_cmp == 0) {
+        if (slope_cmp == 0 || use_canonical_tie_order) {
             if (a.segment == b.segment) {
                 return a.id < b.id;
             }

@@ -74,12 +74,16 @@ int compareSlopeInverse(const ActiveSegment& a, const ActiveSegment& b);
 struct ActiveSegmentCompare {
     const EventPoint* curr_event;                     ///< Current sweep event.
     const std::vector<ActiveSegment>* segments_by_id; ///< Segment geometry by ID.
+    bool use_canonical_tie_order; ///< Whether ties use the canonical segment ordering.
 
     /// \brief Initialize a comparator for one sweep-line active set.
     /// \param curr_event The current event used for active-set ordering.
     /// \param segments_by_id The active segment geometry addressed by SegmentId.
+    /// \param use_canonical_tie_order If true, tied segments use Segment::operator<; otherwise,
+    /// ties use the slope ordering required by the intersection sweep.
     ActiveSegmentCompare(const EventPoint* curr_event,
-                         const std::vector<ActiveSegment>* segments_by_id);
+                         const std::vector<ActiveSegment>* segments_by_id,
+                         bool use_canonical_tie_order = false);
 
     /// \brief Order active segments at the current sweep event.
     /// \param a_id The first active segment ID.

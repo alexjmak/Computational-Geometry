@@ -49,6 +49,7 @@ class RayHitState {
     /// events read this set without changing it.
     std::vector<ActiveSegment> segments_by_id; ///< Canonicalized active segment by input index.
     std::set<SegmentId, ActiveSegmentCompare> curr_segments;
+    std::vector<SegmentId> pending_lower_segments; ///< Lower segments removed after their y-level.
 
     /// \brief Initialize the sweep-line state and active/event containers.
     RayHitState();
@@ -59,6 +60,15 @@ class RayHitState {
     void populateEventQueue(const std::vector<Segment>& segments,
                             const std::vector<Point>& queries);
 
+    /// \brief Remove stale pending lower endpoint segments and queue this event's lower segments.
+    /// \param lower_segments Segments whose lower endpoint is at the current event.
+    /// \param event_point The current event point.
+    void processLowerSegments(const std::vector<SegmentId>& lower_segments,
+                              const Point& event_point);
+
+    /// \brief Remove all queued lower endpoint segments from the active set.
+    void removePendingLowerSegments();
+
     /// \brief Print an active segment and its current sweep-line intersection point.
     /// \param id The active segment ID to print.
     void printElement(SegmentId id);
@@ -66,7 +76,8 @@ class RayHitState {
 
 RayHitState::RayHitState()
     : curr_event(EventPoint(Point(INT_MAX, INT_MAX))), segments_by_id(),
-      curr_segments(ActiveSegmentCompare(&curr_event, &segments_by_id)) {}
+      curr_segments(ActiveSegmentCompare(&curr_event, &segments_by_id, true)),
+      pending_lower_segments() {}
 
 void RayHitState::populateEventQueue(const std::vector<Segment>& segments,
                                      const std::vector<Point>& queries) {
@@ -74,6 +85,12 @@ void RayHitState::populateEventQueue(const std::vector<Segment>& segments,
     for (SegmentId id = 0; id < segments.size(); ++id) {
         segments_by_id.emplace_back(id, segments[id].canonicalizedY());
         const ActiveSegment& lss = segments_by_id.back();
+
+        // Horizontal segments are not strict ray hits, so skip them.
+        if (lss.segment.start.y == lss.segment.end.y) {
+            continue;
+        }
+
         EventPoint upper_endpoint(lss.segment.end);
         EventPoint lower_endpoint(lss.segment.start);
         auto& upper_event = event_queue.try_emplace(upper_endpoint).first->second;
@@ -90,6 +107,33 @@ void RayHitState::populateEventQueue(const std::vector<Segment>& segments,
     if (!event_queue.empty()) {
         curr_event = event_queue.begin()->first;
     }
+}
+
+void RayHitState::processLowerSegments(const std::vector<SegmentId>& lower_segments,
+                                       const Point& event_point) {
+    if (!pending_lower_segments.empty() && curr_event.point.y != event_point.y) {
+        removePendingLowerSegments();
+    }
+
+    if (lower_segments.empty()) {
+        return;
+    }
+
+    pending_lower_segments.insert(pending_lower_segments.end(), lower_segments.begin(),
+                                  lower_segments.end());
+}
+
+void RayHitState::removePendingLowerSegments() {
+    for (SegmentId id : pending_lower_segments) {
+        const ActiveSegment& s = segments_by_id[id];
+        if (debug::rayQueryEnabled()) {
+            debug::rayQuery() << "Remove pending lower " << s.segment.toString() << std::endl;
+        }
+        [[maybe_unused]] size_t count = curr_segments.erase(id);
+        assert(count == 1);
+    }
+
+    pending_lower_segments.clear();
 }
 
 void RayHitState::printElement(SegmentId id) {
@@ -113,11 +157,10 @@ std::optional<SegmentId> handleEventPoint(EventPoint& ls_point, RayHitEvent& eve
         debug::rayQuery() << "Event: " << ls_point.point.toString() << std::endl;
     }
 
+    line_sweep.processLowerSegments(event.lower_segments, ls_point.point);
+
     auto& curr_segments = line_sweep.curr_segments;
     const auto& segments_by_id = line_sweep.segments_by_id;
-    const auto& upper_segments = event.upper_segments;
-    const auto& lower_segments = event.lower_segments;
-    const bool is_query = !event.query_ids.empty();
 
     if (debug::rayQueryEnabled()) {
         debug::rayQuery() << "Active segments before event:" << std::endl;
@@ -126,20 +169,11 @@ std::optional<SegmentId> handleEventPoint(EventPoint& ls_point, RayHitEvent& eve
         }
     }
 
-    for (SegmentId id : lower_segments) {
-        const ActiveSegment& s = segments_by_id[id];
-        if (debug::rayQueryEnabled()) {
-            debug::rayQuery() << "Remove lower " << s.segment.toString() << std::endl;
-        }
-        [[maybe_unused]] size_t count = curr_segments.erase(id);
-        assert(count == 1);
-    }
-
     // Move the sweep line.
     line_sweep.curr_event = ls_point;
 
     // Insert segments that begin at this event so they are active below the current sweep line.
-    for (SegmentId id : upper_segments) {
+    for (SegmentId id : event.upper_segments) {
         const ActiveSegment& s = segments_by_id[id];
         if (debug::rayQueryEnabled()) {
             debug::rayQuery() << "Insert upper " << s.segment.toString() << std::endl;
@@ -155,24 +189,23 @@ std::optional<SegmentId> handleEventPoint(EventPoint& ls_point, RayHitEvent& eve
     }
 
     std::optional<SegmentId> result;
-    if (is_query) {
+    bool is_query_pt = !event.query_ids.empty();
+    if (is_query_pt) {
         const SegmentId dummy_segment_id = segments_by_id.size();
         line_sweep.segments_by_id.emplace_back(dummy_segment_id,
                                                Segment(ls_point.point, ls_point.point));
 
         // The dummy sorts at the query x-coordinate. Its predecessor is the nearest candidate to
-        // the left in the active set; walk farther left when ties or endpoint touches are not
-        // strict left hits.
+        // the left in the active set. ActiveSegmentCompare uses canonical tie ordering here, which
+        // resolves shared endpoint ties so lower and upper endpoint cases pick the closest edge.
         auto it = curr_segments.lower_bound(dummy_segment_id);
 
         while (it != curr_segments.begin()) {
             --it;
             const ActiveSegment& candidate = segments_by_id[*it];
-            if (candidate.segment.start.y == candidate.segment.end.y) {
-                // Horizontal segments are not strict left hits, so skip them.
-                continue;
-            }
+
             std::optional<Point> hit = candidate.pointAtEvent(ls_point.point);
+            // Candidates are never horizontal because they are filtered out in populateEventQueue.
             if (hit && hit->x < ls_point.point.x) {
                 result = *it;
                 break;
@@ -203,6 +236,7 @@ std::vector<std::optional<SegmentId>> leftRayQuery(const std::vector<Segment>& s
             left_ray_hits[query_id] = left_ray_hit;
         }
     }
+    ls.removePendingLowerSegments();
 
     return left_ray_hits;
 }

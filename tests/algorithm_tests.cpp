@@ -476,7 +476,7 @@ TEST(LeftRayQueryTest, HandlesReversedInputSegments) {
     EXPECT_EQ(hits[0].value(), 0);
 }
 
-TEST(LeftRayQueryTest, DISABLED_CountsLowerEndpointStrictlyLeftOfQuery) {
+TEST(LeftRayQueryTest, CountsLowerEndpointStrictlyLeftOfQuery) {
     const std::vector<Segment> segments = {
         Segment(Point(0, 0), Point(5, 5)),
     };
@@ -489,7 +489,7 @@ TEST(LeftRayQueryTest, DISABLED_CountsLowerEndpointStrictlyLeftOfQuery) {
     EXPECT_EQ(hits[0].value(), 0);
 }
 
-TEST(LeftRayQueryTest, DISABLED_PicksCloserEdgeAtLowerEndpointTie) {
+TEST(LeftRayQueryTest, PicksCloserEdgeAtLowerEndpointTie) {
     const std::vector<Segment> segments = {
         Segment(Point(-5, 5), Point(0, 0)),
         Segment(Point(0, 0), Point(5, 5)),
@@ -514,6 +514,20 @@ TEST(LeftRayQueryTest, CountsUpperEndpointStrictlyLeftOfQuery) {
     ASSERT_EQ(hits.size(), 1);
     ASSERT_TRUE(hits[0].has_value());
     EXPECT_EQ(hits[0].value(), 0);
+}
+
+TEST(LeftRayQueryTest, PicksCloserEdgeAtUpperEndpointTie) {
+    const std::vector<Segment> segments = {
+        Segment(Point(-5, 0), Point(0, 5)),
+        Segment(Point(5, 0), Point(0, 5)),
+    };
+    const std::vector<Point> queries = {Point(10, 5)};
+
+    const std::vector<std::optional<sweep::SegmentId>> hits = leftRayQuery(segments, queries);
+
+    ASSERT_EQ(hits.size(), 1);
+    ASSERT_TRUE(hits[0].has_value());
+    EXPECT_EQ(hits[0].value(), 1);
 }
 
 TEST(LeftRayQueryTest, AllowsEitherDuplicateSegmentIdForDuplicateGeometry) {
