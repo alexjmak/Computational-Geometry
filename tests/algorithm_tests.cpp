@@ -150,6 +150,39 @@ OverlayBucketCounts countOverlayBuckets(const OverlayResult& overlay) {
     return counts;
 }
 
+bool isInteriorFace(const std::vector<DCEL::FaceParity>& face_parities, std::size_t face_index) {
+    return face_index < face_parities.size() &&
+           face_parities[face_index] == DCEL::FaceParity::Interior;
+}
+
+OverlayBucketCounts countFilledOverlayBuckets(const OverlayResult& overlay, const DCEL& left,
+                                              const DCEL& right) {
+    const std::vector<DCEL::FaceParity> left_face_parities = left.faceParities();
+    const std::vector<DCEL::FaceParity> right_face_parities = right.faceParities();
+
+    OverlayBucketCounts counts;
+    for (const OverlayFacePolygon& face : overlayFacePolygons(overlay)) {
+        const bool in_left = isInteriorFace(left_face_parities, face.label.left_face);
+        const bool in_right = isInteriorFace(right_face_parities, face.label.right_face);
+        const double area = face.polygon.area();
+
+        EXPECT_GT(area, 0.0);
+        if (in_left && in_right) {
+            ++counts.both;
+            counts.both_area += area;
+        } else if (in_left) {
+            ++counts.left_only;
+            counts.left_only_area += area;
+        } else if (in_right) {
+            ++counts.right_only;
+            counts.right_only_area += area;
+        } else {
+            ++counts.neither;
+        }
+    }
+    return counts;
+}
+
 std::vector<Segment> showcaseSolidLayer() {
     return {
         segment(20, 72, 82, 71), segment(82, 71, 92, 46), segment(92, 46, 74, 21),
@@ -189,6 +222,14 @@ TEST(ConvexHullTest, KeepsOnlyEndpointsForCollinearPoints) {
     const LinearRing hull = convexHull(points);
 
     EXPECT_EQ(hull.points, std::vector<Point>({Point(0, 0), Point(3, 0)}));
+}
+
+TEST(ConvexHullTest, DISABLED_PreservesSingletonPoint) {
+    const std::vector<Point> points = {Point(2, 3)};
+
+    const LinearRing hull = convexHull(points);
+
+    EXPECT_EQ(hull.points, std::vector<Point>({Point(2, 3)}));
 }
 
 TEST(ConvexHullTest, SlowAndFastHullUseSameBoundaryPoints) {
@@ -309,6 +350,32 @@ TEST(AssemblePolygonsTest, BuildsDonutWithIsland) {
     EXPECT_DOUBLE_EQ(island->area(), 4.0);
 }
 
+TEST(AssemblePolygonsTest, BuildsNestedAlternatingRingsWithIslandHole) {
+    std::vector<Segment> segments = rectangleSegments(Point(0, 0), Point(10, 10));
+    appendSegments(segments, rectangleSegments(Point(1, 1), Point(9, 9)));
+    appendSegments(segments, rectangleSegments(Point(2, 2), Point(8, 8)));
+    appendSegments(segments, rectangleSegments(Point(3, 3), Point(7, 7)));
+
+    const std::vector<Polygon> polygons = assemblePolygons(segments);
+
+    ASSERT_EQ(polygons.size(), 2);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(polygons), 56.0);
+
+    const auto outer_donut = std::find_if(polygons.begin(), polygons.end(), [](const Polygon& p) {
+        return p.outer_ring.area() == 100.0;
+    });
+    ASSERT_NE(outer_donut, polygons.end());
+    ASSERT_EQ(outer_donut->inner_rings.size(), 1);
+    EXPECT_DOUBLE_EQ(outer_donut->area(), 36.0);
+
+    const auto island_with_lake =
+        std::find_if(polygons.begin(), polygons.end(),
+                     [](const Polygon& p) { return p.outer_ring.area() == 36.0; });
+    ASSERT_NE(island_with_lake, polygons.end());
+    ASSERT_EQ(island_with_lake->inner_rings.size(), 1);
+    EXPECT_DOUBLE_EQ(island_with_lake->area(), 20.0);
+}
+
 TEST(AssemblePolygonsTest, BuildsPolygonWithTwoHoles) {
     std::vector<Segment> segments;
     const std::vector<Segment> outer_segments = rectangleSegments(Point(15, 0), Point(25, 10));
@@ -326,6 +393,82 @@ TEST(AssemblePolygonsTest, BuildsPolygonWithTwoHoles) {
     ASSERT_EQ(polygon.inner_rings.size(), 2);
     EXPECT_DOUBLE_EQ(polygon.inner_rings[0].area() + polygon.inner_rings[1].area(), 20.0);
     EXPECT_DOUBLE_EQ(polygon.area(), 80.0);
+}
+
+TEST(AssemblePolygonsTest, ReturnsNoPolygonsForEmptySegmentSet) {
+    EXPECT_TRUE(assemblePolygons({}).empty());
+}
+
+TEST(AssemblePolygonsTest, CancelsDuplicateBoundaryUnderOddEvenRule) {
+    std::vector<Segment> segments = rectangleSegments(Point(0, 0), Point(4, 4));
+    const std::vector<Segment> duplicate_segments = rectangleSegments(Point(0, 0), Point(4, 4));
+    appendSegments(segments, duplicate_segments);
+
+    EXPECT_TRUE(assemblePolygons(segments).empty());
+}
+
+TEST(AssemblePolygonsTest, CancelsReversedDuplicateBoundaryUnderOddEvenRule) {
+    std::vector<Segment> segments = rectangleSegments(Point(0, 0), Point(4, 4));
+    appendSegments(segments, rectangleHoleSegments(Point(0, 0), Point(4, 4)));
+
+    EXPECT_TRUE(assemblePolygons(segments).empty());
+}
+
+TEST(AssemblePolygonsTest, BuildsTwoRegionsFromSelfCrossingBowtieBoundary) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(2, 2)),
+        Segment(Point(2, 2), Point(0, 2)),
+        Segment(Point(0, 2), Point(2, 0)),
+        Segment(Point(2, 0), Point(0, 0)),
+    };
+
+    const std::vector<Polygon> polygons = assemblePolygons(segments);
+
+    ASSERT_EQ(polygons.size(), 2);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(polygons), 2.0);
+}
+
+TEST(AssemblePolygonsTest, KeepsPointTouchingRectanglesAsSeparatePolygons) {
+    std::vector<Segment> segments = rectangleSegments(Point(0, 0), Point(1, 1));
+    appendSegments(segments, rectangleSegments(Point(1, 1), Point(2, 2)));
+
+    const std::vector<Polygon> polygons = assemblePolygons(segments);
+
+    ASSERT_EQ(polygons.size(), 2);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(polygons), 2.0);
+}
+
+TEST(AssemblePolygonsTest, DISABLED_MergesSharedEdgeRectanglesIntoOnePolygon) {
+    std::vector<Segment> segments = rectangleSegments(Point(0, 0), Point(1, 1));
+    appendSegments(segments, rectangleSegments(Point(1, 0), Point(2, 1)));
+
+    const std::vector<Polygon> polygons = assemblePolygons(segments);
+
+    ASSERT_EQ(polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(polygons), 2.0);
+    EXPECT_TRUE(polygons[0].inner_rings.empty());
+}
+
+TEST(AssemblePolygonsTest, DISABLED_MergesPartiallySharedEdgeRectanglesIntoOnePolygon) {
+    std::vector<Segment> segments = rectangleSegments(Point(0, 0), Point(4, 4));
+    appendSegments(segments, rectangleSegments(Point(2, 4), Point(6, 6)));
+
+    const std::vector<Polygon> polygons = assemblePolygons(segments);
+
+    ASSERT_EQ(polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(polygons), 24.0);
+    EXPECT_TRUE(polygons[0].inner_rings.empty());
+}
+
+TEST(AssemblePolygonsTest, DISABLED_IgnoresInteriorChordAcrossSquare) {
+    std::vector<Segment> segments = rectangleSegments(Point(0, 0), Point(4, 4));
+    segments.emplace_back(Point(0, 0), Point(4, 4));
+
+    const std::vector<Polygon> polygons = assemblePolygons(segments);
+
+    ASSERT_EQ(polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(polygons), 16.0);
+    EXPECT_TRUE(polygons[0].inner_rings.empty());
 }
 
 TEST(LineSegmentIntersectionTest, FindsSingleCrossingPoint) {
@@ -605,6 +748,182 @@ TEST(SegmentOverlayTest, LabelsDisjointRectanglesSideBySide) {
     EXPECT_DOUBLE_EQ(counts.right_only_area, 16.0);
 }
 
+TEST(SegmentOverlayTest, LabelsSingleSidedOverlayAgainstEmptyArrangement) {
+    const std::vector<Segment> left;
+    const std::vector<Segment> right = rectangleSegments(Point(0, 0), Point(4, 4));
+
+    const OverlayResult overlay = segmentOverlay(left, right);
+    const OverlayBucketCounts counts = countOverlayBuckets(overlay);
+
+    EXPECT_EQ(counts.left_only, 0);
+    EXPECT_EQ(counts.right_only, 1);
+    EXPECT_EQ(counts.both, 0);
+    EXPECT_EQ(counts.neither, 0);
+    EXPECT_DOUBLE_EQ(counts.right_only_area, 16.0);
+}
+
+TEST(SegmentOverlayTest, ProducesNoFiniteFacesForTwoEmptyArrangements) {
+    const std::vector<Segment> left;
+    const std::vector<Segment> right;
+
+    const OverlayResult overlay = segmentOverlay(left, right);
+
+    EXPECT_EQ(overlay.dcel.pointCount(), 0);
+    EXPECT_EQ(overlay.dcel.halfEdgeCount(), 0);
+    ASSERT_EQ(overlay.dcel.faceCount(), 1);
+    ASSERT_EQ(overlay.face_labels.size(), 1);
+    EXPECT_EQ(overlay.face_labels[DCEL::unbounded_face_index].left_face,
+              DCEL::unbounded_face_index);
+    EXPECT_EQ(overlay.face_labels[DCEL::unbounded_face_index].right_face,
+              DCEL::unbounded_face_index);
+    EXPECT_TRUE(overlayFacePolygons(overlay).empty());
+}
+
+TEST(SegmentOverlayTest, TreatsDuplicateLeftBoundaryAsExteriorAgainstRightPolygon) {
+    std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(4, 4));
+    appendSegments(left, rectangleSegments(Point(0, 0), Point(4, 4)));
+    const std::vector<Segment> right = rectangleSegments(Point(0, 0), Point(4, 4));
+
+    const DCEL left_dcel = DCEL::fromSegments(left);
+    const DCEL right_dcel = DCEL::fromSegments(right);
+    const OverlayResult overlay = segmentOverlay(left_dcel, right_dcel);
+    const OverlayBucketCounts counts = countFilledOverlayBuckets(overlay, left_dcel, right_dcel);
+
+    EXPECT_EQ(counts.left_only, 0);
+    EXPECT_EQ(counts.right_only, 1);
+    EXPECT_EQ(counts.both, 0);
+    EXPECT_EQ(counts.neither, 0);
+    EXPECT_DOUBLE_EQ(counts.right_only_area, 16.0);
+}
+
+TEST(SegmentOverlayTest, LabelsOpenRightChordAsNonFilledOverlaySplitter) {
+    const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(4, 4));
+    const std::vector<Segment> right = {
+        Segment(Point(0, 0), Point(4, 4)),
+    };
+
+    const OverlayResult overlay = segmentOverlay(left, right);
+    const OverlayBucketCounts counts = countOverlayBuckets(overlay);
+
+    EXPECT_EQ(counts.left_only, 2);
+    EXPECT_EQ(counts.right_only, 0);
+    EXPECT_EQ(counts.both, 0);
+    EXPECT_EQ(counts.neither, 0);
+    EXPECT_DOUBLE_EQ(counts.left_only_area, 16.0);
+}
+
+TEST(SegmentOverlayTest, DISABLED_LabelsPointTouchingRectanglesAsSeparateInteriors) {
+    const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(1, 1));
+    const std::vector<Segment> right = rectangleSegments(Point(1, 1), Point(2, 2));
+
+    const OverlayResult overlay = segmentOverlay(left, right);
+    const OverlayBucketCounts counts = countOverlayBuckets(overlay);
+
+    EXPECT_EQ(counts.left_only, 1);
+    EXPECT_EQ(counts.right_only, 1);
+    EXPECT_EQ(counts.both, 0);
+    EXPECT_EQ(counts.neither, 0);
+    EXPECT_DOUBLE_EQ(counts.left_only_area, 1.0);
+    EXPECT_DOUBLE_EQ(counts.right_only_area, 1.0);
+}
+
+TEST(SegmentOverlayTest, LabelsSharedEdgeRectanglesAsSeparateInteriors) {
+    const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(1, 1));
+    const std::vector<Segment> right = rectangleSegments(Point(1, 0), Point(2, 1));
+
+    const OverlayResult overlay = segmentOverlay(left, right);
+    const OverlayBucketCounts counts = countOverlayBuckets(overlay);
+
+    EXPECT_EQ(counts.left_only, 1);
+    EXPECT_EQ(counts.right_only, 1);
+    EXPECT_EQ(counts.both, 0);
+    EXPECT_EQ(counts.neither, 0);
+    EXPECT_DOUBLE_EQ(counts.left_only_area, 1.0);
+    EXPECT_DOUBLE_EQ(counts.right_only_area, 1.0);
+}
+
+TEST(SegmentOverlayTest, LabelsPartialSharedEdgeRectanglesAsSeparateInteriors) {
+    const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(4, 4));
+    const std::vector<Segment> right = rectangleSegments(Point(2, 4), Point(6, 6));
+
+    const OverlayResult overlay = segmentOverlay(left, right);
+    const OverlayBucketCounts counts = countOverlayBuckets(overlay);
+
+    EXPECT_EQ(counts.left_only, 1);
+    EXPECT_EQ(counts.right_only, 1);
+    EXPECT_EQ(counts.both, 0);
+    EXPECT_EQ(counts.neither, 0);
+    EXPECT_DOUBLE_EQ(counts.left_only_area, 16.0);
+    EXPECT_DOUBLE_EQ(counts.right_only_area, 8.0);
+}
+
+TEST(SegmentOverlayTest, LabelsContainedStripSplittingRectangle) {
+    const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(6, 4));
+    const std::vector<Segment> right = rectangleSegments(Point(2, 0), Point(4, 4));
+
+    const OverlayResult overlay = segmentOverlay(left, right);
+    const OverlayBucketCounts counts = countOverlayBuckets(overlay);
+
+    EXPECT_EQ(counts.left_only, 2);
+    EXPECT_EQ(counts.right_only, 0);
+    EXPECT_EQ(counts.both, 1);
+    EXPECT_EQ(counts.neither, 0);
+    EXPECT_DOUBLE_EQ(counts.left_only_area, 16.0);
+    EXPECT_DOUBLE_EQ(counts.both_area, 8.0);
+}
+
+TEST(SegmentOverlayTest, LabelsContainedRectangleTouchingShellBoundary) {
+    const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(6, 4));
+    const std::vector<Segment> right = rectangleSegments(Point(2, 0), Point(4, 2));
+
+    const OverlayResult overlay = segmentOverlay(left, right);
+    const OverlayBucketCounts counts = countOverlayBuckets(overlay);
+
+    EXPECT_EQ(counts.left_only, 1);
+    EXPECT_EQ(counts.right_only, 0);
+    EXPECT_EQ(counts.both, 1);
+    EXPECT_EQ(counts.neither, 0);
+    EXPECT_DOUBLE_EQ(counts.left_only_area, 20.0);
+    EXPECT_DOUBLE_EQ(counts.both_area, 4.0);
+}
+
+TEST(SegmentOverlayTest, LabelsPolygonInsideHoleAsRightOnly) {
+    std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(10, 10));
+    appendSegments(left, rectangleHoleSegments(Point(3, 3), Point(7, 7)));
+    const std::vector<Segment> right = rectangleSegments(Point(4, 4), Point(6, 6));
+
+    const DCEL left_dcel = DCEL::fromSegments(left);
+    const DCEL right_dcel = DCEL::fromSegments(right);
+    const OverlayResult overlay = segmentOverlay(left_dcel, right_dcel);
+    const OverlayBucketCounts counts = countFilledOverlayBuckets(overlay, left_dcel, right_dcel);
+
+    EXPECT_EQ(counts.left_only, 1);
+    EXPECT_EQ(counts.right_only, 1);
+    EXPECT_EQ(counts.both, 0);
+    EXPECT_EQ(counts.neither, 1);
+    EXPECT_DOUBLE_EQ(counts.left_only_area, 84.0);
+    EXPECT_DOUBLE_EQ(counts.right_only_area, 4.0);
+}
+
+TEST(SegmentOverlayTest, LabelsRectangleCrossingHoleBoundaryByFilledParity) {
+    std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(10, 10));
+    appendSegments(left, rectangleHoleSegments(Point(3, 3), Point(7, 7)));
+    const std::vector<Segment> right = rectangleSegments(Point(5, 5), Point(9, 9));
+
+    const DCEL left_dcel = DCEL::fromSegments(left);
+    const DCEL right_dcel = DCEL::fromSegments(right);
+    const OverlayResult overlay = segmentOverlay(left_dcel, right_dcel);
+    const OverlayBucketCounts counts = countFilledOverlayBuckets(overlay, left_dcel, right_dcel);
+
+    EXPECT_EQ(counts.left_only, 1);
+    EXPECT_EQ(counts.right_only, 1);
+    EXPECT_EQ(counts.both, 1);
+    EXPECT_EQ(counts.neither, 1);
+    EXPECT_DOUBLE_EQ(counts.left_only_area, 72.0);
+    EXPECT_DOUBLE_EQ(counts.right_only_area, 4.0);
+    EXPECT_DOUBLE_EQ(counts.both_area, 12.0);
+}
+
 TEST(SegmentOverlayTest, LabelsOverlayShowcaseFaces) {
     const OverlayResult overlay = segmentOverlay(showcaseSolidLayer(), showcaseDottedLayer());
     const OverlayBucketCounts counts = countOverlayBuckets(overlay);
@@ -634,6 +953,101 @@ TEST(PolygonBooleanTest, AppliesTruthTableToOverlappingRectangles) {
     EXPECT_DOUBLE_EQ(totalPolygonArea(difference), 8.0);
 
     ASSERT_EQ(symmetric_difference.size(), 2);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 16.0);
+}
+
+TEST(PolygonBooleanTest, AppliesTruthTableWithEmptyLeftInput) {
+    const std::vector<Segment> left;
+    const std::vector<Segment> right = rectangleSegments(Point(0, 0), Point(4, 4));
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    EXPECT_TRUE(intersection.empty());
+
+    ASSERT_EQ(union_polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 16.0);
+
+    EXPECT_TRUE(difference.empty());
+
+    ASSERT_EQ(symmetric_difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 16.0);
+}
+
+TEST(PolygonBooleanTest, AppliesTruthTableWithEmptyRightInput) {
+    const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(4, 4));
+    const std::vector<Segment> right;
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    EXPECT_TRUE(intersection.empty());
+
+    ASSERT_EQ(union_polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 16.0);
+
+    ASSERT_EQ(difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(difference), 16.0);
+
+    ASSERT_EQ(symmetric_difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 16.0);
+}
+
+TEST(PolygonBooleanTest, AppliesTruthTableWithBothInputsEmpty) {
+    const std::vector<Segment> left;
+    const std::vector<Segment> right;
+
+    EXPECT_TRUE(assemblePolygons(polygonAnd(left, right)).empty());
+    EXPECT_TRUE(assemblePolygons(polygonOr(left, right)).empty());
+    EXPECT_TRUE(assemblePolygons(polygonDifference(left, right)).empty());
+    EXPECT_TRUE(assemblePolygons(polygonXor(left, right)).empty());
+}
+
+TEST(PolygonBooleanTest, AppliesTruthTableWithDuplicateLeftBoundary) {
+    std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(4, 4));
+    appendSegments(left, rectangleSegments(Point(0, 0), Point(4, 4)));
+    const std::vector<Segment> right = rectangleSegments(Point(0, 0), Point(4, 4));
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    EXPECT_TRUE(intersection.empty());
+
+    ASSERT_EQ(union_polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 16.0);
+
+    EXPECT_TRUE(difference.empty());
+
+    ASSERT_EQ(symmetric_difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 16.0);
+}
+
+TEST(PolygonBooleanTest, DISABLED_IgnoresOpenRightChordAsZeroAreaInput) {
+    const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(4, 4));
+    const std::vector<Segment> right = {
+        Segment(Point(0, 0), Point(4, 4)),
+    };
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    EXPECT_TRUE(intersection.empty());
+
+    ASSERT_EQ(union_polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 16.0);
+
+    ASSERT_EQ(difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(difference), 16.0);
+
+    ASSERT_EQ(symmetric_difference.size(), 1);
     EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 16.0);
 }
 
@@ -680,6 +1094,203 @@ TEST(PolygonBooleanTest, AppliesTruthTableToContainedRectangles) {
     ASSERT_EQ(symmetric_difference.size(), 1);
     EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 84.0);
     ASSERT_EQ(symmetric_difference[0].inner_rings.size(), 1);
+}
+
+TEST(PolygonBooleanTest, AppliesTruthTableToIdenticalRectangles) {
+    const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(4, 4));
+    const std::vector<Segment> right = rectangleSegments(Point(0, 0), Point(4, 4));
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    ASSERT_EQ(intersection.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(intersection), 16.0);
+
+    ASSERT_EQ(union_polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 16.0);
+
+    EXPECT_TRUE(difference.empty());
+    EXPECT_TRUE(symmetric_difference.empty());
+}
+
+TEST(PolygonBooleanTest, DISABLED_AppliesTruthTableToPointTouchingRectangles) {
+    const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(1, 1));
+    const std::vector<Segment> right = rectangleSegments(Point(1, 1), Point(2, 2));
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    EXPECT_TRUE(intersection.empty());
+
+    ASSERT_EQ(union_polygons.size(), 2);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 2.0);
+
+    ASSERT_EQ(difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(difference), 1.0);
+
+    ASSERT_EQ(symmetric_difference.size(), 2);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 2.0);
+}
+
+TEST(PolygonBooleanTest, AppliesTruthTableToSharedEdgeRectangles) {
+    const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(1, 1));
+    const std::vector<Segment> right = rectangleSegments(Point(1, 0), Point(2, 1));
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    EXPECT_TRUE(intersection.empty());
+
+    ASSERT_EQ(union_polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 2.0);
+
+    ASSERT_EQ(difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(difference), 1.0);
+
+    ASSERT_EQ(symmetric_difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 2.0);
+}
+
+TEST(PolygonBooleanTest, AppliesTruthTableToPartialSharedEdgeRectangles) {
+    const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(4, 4));
+    const std::vector<Segment> right = rectangleSegments(Point(2, 4), Point(6, 6));
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    EXPECT_TRUE(intersection.empty());
+
+    ASSERT_EQ(union_polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 24.0);
+
+    ASSERT_EQ(difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(difference), 16.0);
+
+    ASSERT_EQ(symmetric_difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 24.0);
+}
+
+TEST(PolygonBooleanTest, DifferenceCanSplitRectangleIntoTwoPolygons) {
+    const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(6, 4));
+    const std::vector<Segment> right = rectangleSegments(Point(2, 0), Point(4, 4));
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    ASSERT_EQ(intersection.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(intersection), 8.0);
+
+    ASSERT_EQ(union_polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 24.0);
+
+    ASSERT_EQ(difference.size(), 2);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(difference), 16.0);
+
+    ASSERT_EQ(symmetric_difference.size(), 2);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 16.0);
+}
+
+TEST(PolygonBooleanTest, AppliesTruthTableToContainedRectangleTouchingShellBoundary) {
+    const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(6, 4));
+    const std::vector<Segment> right = rectangleSegments(Point(2, 0), Point(4, 2));
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    ASSERT_EQ(intersection.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(intersection), 4.0);
+
+    ASSERT_EQ(union_polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 24.0);
+
+    ASSERT_EQ(difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(difference), 20.0);
+
+    ASSERT_EQ(symmetric_difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 20.0);
+}
+
+TEST(PolygonBooleanTest, AppliesTruthTableToPolygonInsideHole) {
+    std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(10, 10));
+    appendSegments(left, rectangleHoleSegments(Point(3, 3), Point(7, 7)));
+    const std::vector<Segment> right = rectangleSegments(Point(4, 4), Point(6, 6));
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    EXPECT_TRUE(intersection.empty());
+
+    ASSERT_EQ(union_polygons.size(), 2);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 88.0);
+
+    ASSERT_EQ(difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(difference), 84.0);
+    ASSERT_EQ(difference[0].inner_rings.size(), 1);
+
+    ASSERT_EQ(symmetric_difference.size(), 2);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 88.0);
+}
+
+TEST(PolygonBooleanTest, AppliesTruthTableToRectangleCrossingHoleBoundary) {
+    std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(10, 10));
+    appendSegments(left, rectangleHoleSegments(Point(3, 3), Point(7, 7)));
+    const std::vector<Segment> right = rectangleSegments(Point(5, 5), Point(9, 9));
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    ASSERT_EQ(intersection.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(intersection), 12.0);
+
+    ASSERT_EQ(union_polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 88.0);
+
+    ASSERT_EQ(difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(difference), 72.0);
+
+    ASSERT_EQ(symmetric_difference.size(), 2);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 76.0);
+}
+
+TEST(PolygonBooleanTest, AppliesTruthTableToPolygonMatchingHoleBoundary) {
+    std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(10, 10));
+    appendSegments(left, rectangleHoleSegments(Point(3, 3), Point(7, 7)));
+    const std::vector<Segment> right = rectangleSegments(Point(3, 3), Point(7, 7));
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    EXPECT_TRUE(intersection.empty());
+
+    ASSERT_EQ(union_polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 100.0);
+    EXPECT_TRUE(union_polygons[0].inner_rings.empty());
+
+    ASSERT_EQ(difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(difference), 84.0);
+    ASSERT_EQ(difference[0].inner_rings.size(), 1);
+
+    ASSERT_EQ(symmetric_difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 100.0);
+    EXPECT_TRUE(symmetric_difference[0].inner_rings.empty());
 }
 
 TEST(PolygonBooleanTest, BuildsIntersectionOfTwoDonuts) {
