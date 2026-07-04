@@ -129,6 +129,11 @@ class DCEL {
     /// \returns The segment from the half-edge origin to its twin's origin.
     Segment segmentOf(const HalfEdge& half_edge) const;
 
+    /// \brief Compute nearest half-edges immediately left of query points.
+    /// \param queries The query points whose left ray should be tested.
+    /// \returns One half-edge index per query, or DCEL::npos when no edge is hit.
+    std::vector<std::size_t> computeNearestLeftHalfEdges(const std::vector<Point>& queries) const;
+
     /// \brief Convert a half-edge ring into a geometric ring.
     /// \param half_edge The half-edge whose ring should be converted.
     /// \returns A ring containing the vertices of the half-edge ring.

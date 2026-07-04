@@ -136,12 +136,17 @@ struct DCELBuilderRing {
         DCEL::npos; ///< Nearest left half-edge from leftmost point.
 };
 
+/// \brief Print a compact list of half-edge indices to the DCEL debug stream.
+/// \param half_edges Half-edge indices to print.
 void debugPrintHalfEdgeList(const std::vector<std::size_t>& half_edges) {
     for (std::size_t half_edge : half_edges) {
         debug::dcel() << ' ' << half_edge;
     }
 }
 
+/// \brief Return the opposite known face parity.
+/// \param parity Known face parity to flip.
+/// \returns Interior for exterior input, and exterior for interior input.
 DCEL::FaceParity oppositeFaceParity(DCEL::FaceParity parity) {
     assert(parity != DCEL::FaceParity::Unknown);
 
@@ -151,6 +156,9 @@ DCEL::FaceParity oppositeFaceParity(DCEL::FaceParity parity) {
     return DCEL::FaceParity::Exterior;
 }
 
+/// \brief Convert a face parity enum to a debug-printable name.
+/// \param parity Face parity value to name.
+/// \returns String name for the parity value.
 std::string faceParityName(DCEL::FaceParity parity) {
     switch (parity) {
     case DCEL::FaceParity::Unknown:
@@ -164,6 +172,9 @@ std::string faceParityName(DCEL::FaceParity parity) {
     return "<invalid>";
 }
 
+/// \brief Dump all boundary half-edges for one face to the DCEL debug stream.
+/// \param dcel DCEL containing the face.
+/// \param face_index Face index to print.
 void dumpFaceBoundary(const DCEL& dcel, std::size_t face_index) {
     const DCEL::Face& face = dcel.face(face_index);
     auto dump_component = [&](const char* label, std::size_t component) {
@@ -190,6 +201,13 @@ void dumpFaceBoundary(const DCEL& dcel, std::size_t face_index) {
     }
 }
 
+/// \brief Dump detailed context for an inconsistent face-parity propagation step.
+/// \param dcel DCEL whose face graph is being traversed.
+/// \param face_parities Current parity assignments indexed by face.
+/// \param face_index Current face index.
+/// \param adjacent_face Adjacent face with the conflicting parity assignment.
+/// \param half_edge_index Half-edge crossed from the current face.
+/// \param expected_parity Parity expected for the adjacent face.
 void dumpFaceParityConflict(const DCEL& dcel, const std::vector<DCEL::FaceParity>& face_parities,
                             std::size_t face_index, std::size_t adjacent_face,
                             std::size_t half_edge_index, DCEL::FaceParity expected_parity) {
@@ -278,6 +296,11 @@ class DCEL::Creator {
     /// \brief Compute the nearest half-edge left of the leftmost edge of inner boundary rings.
     void computeNearestLeftEdges();
 
+    /// \brief Collect leftmost query points for non-outer boundary rings.
+    /// \param ring_by_query_out Output map from query index to boundary ring index.
+    /// \returns Query points at the leftmost vertex of each non-outer boundary ring.
+    std::vector<Point> collectInnerRingLeftmostPoints(std::vector<std::size_t>& ring_by_query_out);
+
     /// \brief Create the initial mapping from ring roots to face indices.
     /// \param unbounded_ring_index The union-find node for the imaginary unbounded boundary.
     /// \returns A map from union-find roots to DCEL face indices, seeded with the unbounded face.
@@ -305,15 +328,6 @@ class DCEL::Creator {
     /// \param half_edge_indices Ordered half-edge indices for the ring.
     /// \returns The half-edge index with the lexicographically smallest origin.
     std::size_t leftmostHalfEdge(const std::vector<std::size_t>& half_edge_indices) const;
-
-    /// \brief Find the half-edge whose segment intersects the horizontal ray to the left of a point
-    /// and has the rightmost intersection among all such half-edges. Returns DCEL::npos if no such
-    /// half-edge exists.
-    /// \param point The point whose left ray we are intersecting with the half-edges.
-    /// \returns The half-edge with the rightmost intersection with the horizontal ray to the left
-    /// of
-    /// point, or DCEL::npos if no half-edge intersects that ray.
-    std::size_t findNearestHalfEdgeToLeft(const Point& point);
 
     /// \brief Return an existing half-edge pair for a segment or create a new pair.
     /// \param segment The directed segment for the requested half-edge.
@@ -448,64 +462,6 @@ DCEL DCEL::Creator::build(const std::vector<Segment>& segments) {
     return std::move(dcel);
 }
 
-std::size_t DCEL::Creator::findNearestHalfEdgeToLeft(const Point& point) {
-    std::size_t nearest_left_half_edge = DCEL::npos;
-    std::optional<Point> nearest_intersection;
-
-    for (std::size_t half_edge_index = 0; half_edge_index < dcel.half_edges.size();
-         ++half_edge_index) {
-        const DCEL::HalfEdge& half_edge = dcel.half_edges[half_edge_index];
-        if (half_edge_index > half_edge.twin) {
-            // Test each geometric edge once, then choose the directed twin whose
-            // incident face is on the same side as point.
-            continue;
-        }
-
-        Segment half_edge_segment = dcel.segmentOf(half_edge);
-        if (half_edge_segment.start.y == point.y && half_edge_segment.end.y == point.y) {
-            // A horizontal edge ending at the query point is the nearest possible left hit. Use
-            // the opposite direction so point-touching exterior rings union with each other.
-            const DCEL::HalfEdge& twin_half_edge = dcel.twinOf(half_edge);
-            const Point& half_edge_origin = dcel.originOf(half_edge);
-            const Point& twin_origin = dcel.originOf(twin_half_edge);
-
-            if (half_edge_origin == point && twin_origin.x < point.x) {
-                return half_edge.twin;
-            }
-            if (twin_origin == point && half_edge_origin.x < point.x) {
-                return half_edge_index;
-            }
-        }
-
-        std::optional<Point> intersection = leftRayIntersection(half_edge_segment, point);
-        if (!intersection) {
-            // This half edge does not intersect the hole's leftmost point, so we can skip it.
-            continue;
-        }
-
-        // Collinear hits lie on the same horizontal line as the query point and do not identify
-        // which incident face is on the same side as the point.
-        Rational point_orientation =
-            orientation(half_edge_segment.start, half_edge_segment.end, point);
-        if (point_orientation == 0) {
-            continue;
-        }
-
-        if (!nearest_intersection || intersection->x > nearest_intersection->x) {
-            nearest_intersection = intersection;
-            // We want the half-edge whose incident face is on the same side as point.
-            // We can determine this by checking the orientation of the half-edge segment with
-            // respect to point.
-            if (point_orientation < 0) {
-                nearest_left_half_edge = half_edge.twin;
-            } else if (point_orientation > 0) {
-                nearest_left_half_edge = half_edge_index;
-            }
-        }
-    }
-    return nearest_left_half_edge;
-}
-
 void DCEL::Creator::createFaces() {
     if (debug::dcelEnabled()) {
         debug::dcel() << "[dcel] createFaces: rings=" << boundary_rings.size() << '\n';
@@ -568,26 +524,25 @@ void DCEL::Creator::groupBoundaryRingsByFace(const std::size_t unbounded_ring_in
 }
 
 void DCEL::Creator::computeNearestLeftEdges() {
-    std::vector<Segment> sweep_segments;
-    std::vector<std::size_t> half_edge_by_sweep_segment;
-    sweep_segments.reserve(dcel.half_edges.size() / 2);
-    half_edge_by_sweep_segment.reserve(dcel.half_edges.size() / 2);
-
-    for (std::size_t half_edge_index = 0; half_edge_index < dcel.half_edges.size();
-         ++half_edge_index) {
-        const DCEL::HalfEdge& half_edge = dcel.half_edges[half_edge_index];
-        if (half_edge_index > half_edge.twin) {
-            continue;
-        }
-
-        sweep_segments.push_back(dcel.segmentOf(half_edge));
-        half_edge_by_sweep_segment.push_back(half_edge_index);
-    }
-
-    std::vector<Point> queries;
     std::vector<std::size_t> ring_by_query;
+    const std::vector<Point> queries = collectInnerRingLeftmostPoints(ring_by_query);
+
+    const std::vector<std::size_t> nearest_left_half_edges =
+        dcel.computeNearestLeftHalfEdges(queries);
+    assert(nearest_left_half_edges.size() == queries.size());
+
+    for (std::size_t query_index = 0; query_index < nearest_left_half_edges.size(); ++query_index) {
+        boundary_rings[ring_by_query[query_index]].nearest_left_half_edge =
+            nearest_left_half_edges[query_index];
+    }
+}
+
+std::vector<Point>
+DCEL::Creator::collectInnerRingLeftmostPoints(std::vector<std::size_t>& ring_by_query_out) {
+    std::vector<Point> queries;
     queries.reserve(boundary_rings.size());
-    ring_by_query.reserve(boundary_rings.size());
+    ring_by_query_out.clear();
+    ring_by_query_out.reserve(boundary_rings.size());
 
     for (std::size_t ring_index = 0; ring_index < boundary_rings.size(); ++ring_index) {
         DCELBuilderRing& boundary_ring = boundary_rings[ring_index];
@@ -600,12 +555,33 @@ void DCEL::Creator::computeNearestLeftEdges() {
         const std::size_t leftmost_half_edge_index = leftmostHalfEdge(boundary_ring.half_edges);
         const DCEL::HalfEdge& leftmost_half_edge = dcel.half_edges[leftmost_half_edge_index];
         queries.push_back(dcel.originOf(leftmost_half_edge));
-        ring_by_query.push_back(ring_index);
+        ring_by_query_out.push_back(ring_index);
+    }
+
+    return queries;
+}
+
+std::vector<std::size_t>
+DCEL::computeNearestLeftHalfEdges(const std::vector<Point>& queries) const {
+    std::vector<Segment> sweep_segments;
+    std::vector<std::size_t> half_edge_by_sweep_segment;
+    sweep_segments.reserve(half_edges.size() / 2);
+    half_edge_by_sweep_segment.reserve(half_edges.size() / 2);
+
+    for (std::size_t half_edge_index = 0; half_edge_index < half_edges.size(); ++half_edge_index) {
+        const DCEL::HalfEdge& half_edge = half_edges[half_edge_index];
+        if (half_edge_index > half_edge.twin) {
+            continue;
+        }
+
+        sweep_segments.push_back(segmentOf(half_edge));
+        half_edge_by_sweep_segment.push_back(half_edge_index);
     }
 
     const std::vector<std::optional<sweep::SegmentId>> hits = leftRayQuery(sweep_segments, queries);
     assert(hits.size() == queries.size());
 
+    std::vector<std::size_t> nearest_left_half_edges(queries.size(), DCEL::npos);
     for (std::size_t query_index = 0; query_index < hits.size(); ++query_index) {
         if (!hits[query_index].has_value()) {
             continue;
@@ -613,8 +589,8 @@ void DCEL::Creator::computeNearestLeftEdges() {
 
         const std::size_t nearest_half_edge_index =
             half_edge_by_sweep_segment[hits[query_index].value()];
-        const DCEL::HalfEdge& nearest_half_edge = dcel.half_edges[nearest_half_edge_index];
-        const Segment nearest_segment = dcel.segmentOf(nearest_half_edge);
+        const DCEL::HalfEdge& nearest_half_edge = half_edges[nearest_half_edge_index];
+        const Segment nearest_segment = segmentOf(nearest_half_edge);
         const Rational point_orientation =
             orientation(nearest_segment.start, nearest_segment.end, queries[query_index]);
 
@@ -623,13 +599,13 @@ void DCEL::Creator::computeNearestLeftEdges() {
         // Want to pick the half-edge whose incident face is on the same side as the query point.
         // So, the query point should be on the left side of the half-edge segment.
         if (point_orientation > 0) {
-            boundary_rings[ring_by_query[query_index]].nearest_left_half_edge =
-                nearest_half_edge_index;
+            nearest_left_half_edges[query_index] = nearest_half_edge_index;
         } else {
-            boundary_rings[ring_by_query[query_index]].nearest_left_half_edge =
-                nearest_half_edge.twin;
+            nearest_left_half_edges[query_index] = nearest_half_edge.twin;
         }
     }
+
+    return nearest_left_half_edges;
 }
 
 std::unordered_map<std::size_t, std::size_t>

@@ -31,7 +31,7 @@ using sweep::EventPoint;
 using sweep::SegmentId;
 
 /// \brief Event-queue payload for one segment endpoint or query point.
-class RayHitEvent {
+class RayQueryEvent {
   public:
     std::vector<SegmentId> upper_segments; ///< Segments whose upper endpoint is this event.
     std::vector<SegmentId> lower_segments; ///< Segments whose lower endpoint is this event.
@@ -39,10 +39,10 @@ class RayHitEvent {
 };
 
 /// \brief Mutable sweep-line state for batched left-ray queries.
-class RayHitState {
+class RayQueryState {
   public:
     mutable EventPoint curr_event; ///< The event point currently used for active-set ordering.
-    std::map<EventPoint, RayHitEvent> event_queue; ///< Pending endpoint and query events.
+    std::map<EventPoint, RayQueryEvent> event_queue; ///< Pending endpoint and query events.
     /// \brief Active segments ordered by curr_event.
     ///
     /// Segments are removed at their lower endpoint and inserted at their upper endpoint. Query
@@ -52,7 +52,7 @@ class RayHitState {
     std::vector<SegmentId> pending_lower_segments; ///< Lower segments removed after their y-level.
 
     /// \brief Initialize the sweep-line state and active/event containers.
-    RayHitState();
+    RayQueryState();
 
     /// \brief Seed the event queue with segment endpoint events.
     /// \param segments The input segments to add to the sweep.
@@ -74,13 +74,13 @@ class RayHitState {
     void printElement(SegmentId id);
 };
 
-RayHitState::RayHitState()
+RayQueryState::RayQueryState()
     : curr_event(EventPoint(Point(INT_MAX, INT_MAX))), segments_by_id(),
       curr_segments(ActiveSegmentCompare(&curr_event, &segments_by_id, true)),
       pending_lower_segments() {}
 
-void RayHitState::populateEventQueue(const std::vector<Segment>& segments,
-                                     const std::vector<Point>& queries) {
+void RayQueryState::populateEventQueue(const std::vector<Segment>& segments,
+                                       const std::vector<Point>& queries) {
     segments_by_id.reserve(segments.size());
     for (SegmentId id = 0; id < segments.size(); ++id) {
         segments_by_id.emplace_back(id, segments[id].canonicalizedY());
@@ -109,8 +109,8 @@ void RayHitState::populateEventQueue(const std::vector<Segment>& segments,
     }
 }
 
-void RayHitState::processLowerSegments(const std::vector<SegmentId>& lower_segments,
-                                       const Point& event_point) {
+void RayQueryState::processLowerSegments(const std::vector<SegmentId>& lower_segments,
+                                         const Point& event_point) {
     if (!pending_lower_segments.empty() && curr_event.point.y != event_point.y) {
         removePendingLowerSegments();
     }
@@ -123,7 +123,7 @@ void RayHitState::processLowerSegments(const std::vector<SegmentId>& lower_segme
                                   lower_segments.end());
 }
 
-void RayHitState::removePendingLowerSegments() {
+void RayQueryState::removePendingLowerSegments() {
     for (SegmentId id : pending_lower_segments) {
         const ActiveSegment& s = segments_by_id[id];
         if (debug::rayQueryEnabled()) {
@@ -136,7 +136,7 @@ void RayHitState::removePendingLowerSegments() {
     pending_lower_segments.clear();
 }
 
-void RayHitState::printElement(SegmentId id) {
+void RayQueryState::printElement(SegmentId id) {
     const ActiveSegment& key = segments_by_id[id];
     auto point = key.pointAtEvent(curr_event.point);
     if (point) {
@@ -150,8 +150,8 @@ void RayHitState::printElement(SegmentId id) {
 /// \param event The event data associated with the point.
 /// \param line_sweep The sweep-line state to update.
 /// \returns The nearest active segment strictly left of a query event, or std::nullopt.
-std::optional<SegmentId> handleEventPoint(EventPoint& ls_point, RayHitEvent& event,
-                                          RayHitState& line_sweep) {
+std::optional<SegmentId> handleEventPoint(EventPoint& ls_point, RayQueryEvent& event,
+                                          RayQueryState& line_sweep) {
     if (debug::rayQueryEnabled()) {
         debug::rayQuery() << std::endl;
         debug::rayQuery() << "Event: " << ls_point.point.toString() << std::endl;
@@ -220,14 +220,14 @@ std::optional<SegmentId> handleEventPoint(EventPoint& ls_point, RayHitEvent& eve
 
 std::vector<std::optional<SegmentId>> leftRayQuery(const std::vector<Segment>& segments,
                                                    const std::vector<Point>& queries) {
-    RayHitState ls;
+    RayQueryState ls;
     ls.populateEventQueue(segments, queries);
 
     std::vector<std::optional<SegmentId>> left_ray_hits(queries.size());
     while (!ls.event_queue.empty()) {
         auto it = ls.event_queue.begin();
         sweep::EventPoint p = it->first;
-        RayHitEvent e = std::move(it->second);
+        RayQueryEvent e = std::move(it->second);
         ls.event_queue.erase(it);
 
         std::optional<SegmentId> left_ray_hit = handleEventPoint(p, e, ls);

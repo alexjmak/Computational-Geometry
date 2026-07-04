@@ -590,6 +590,21 @@ TEST(SegmentOverlayTest, LabelsContainedPolygonShowcaseFaces) {
     EXPECT_DOUBLE_EQ(counts.both_area, 12.0);
 }
 
+TEST(SegmentOverlayTest, LabelsDisjointRectanglesSideBySide) {
+    const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(4, 4));
+    const std::vector<Segment> right = rectangleSegments(Point(6, 0), Point(10, 4));
+
+    const OverlayResult overlay = segmentOverlay(left, right);
+    const OverlayBucketCounts counts = countOverlayBuckets(overlay);
+
+    EXPECT_EQ(counts.left_only, 1);
+    EXPECT_EQ(counts.right_only, 1);
+    EXPECT_EQ(counts.both, 0);
+    EXPECT_EQ(counts.neither, 0);
+    EXPECT_DOUBLE_EQ(counts.left_only_area, 16.0);
+    EXPECT_DOUBLE_EQ(counts.right_only_area, 16.0);
+}
+
 TEST(SegmentOverlayTest, LabelsOverlayShowcaseFaces) {
     const OverlayResult overlay = segmentOverlay(showcaseSolidLayer(), showcaseDottedLayer());
     const OverlayBucketCounts counts = countOverlayBuckets(overlay);
@@ -620,6 +635,51 @@ TEST(PolygonBooleanTest, AppliesTruthTableToOverlappingRectangles) {
 
     ASSERT_EQ(symmetric_difference.size(), 2);
     EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 16.0);
+}
+
+TEST(PolygonBooleanTest, AppliesTruthTableToDisjointRectanglesSideBySide) {
+    const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(4, 4));
+    const std::vector<Segment> right = rectangleSegments(Point(6, 0), Point(10, 4));
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    EXPECT_TRUE(intersection.empty());
+
+    ASSERT_EQ(union_polygons.size(), 2);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 32.0);
+
+    ASSERT_EQ(difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(difference), 16.0);
+
+    ASSERT_EQ(symmetric_difference.size(), 2);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 32.0);
+}
+
+TEST(PolygonBooleanTest, AppliesTruthTableToContainedRectangles) {
+    const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(10, 10));
+    const std::vector<Segment> right = rectangleSegments(Point(3, 3), Point(7, 7));
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    ASSERT_EQ(intersection.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(intersection), 16.0);
+
+    ASSERT_EQ(union_polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 100.0);
+
+    ASSERT_EQ(difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(difference), 84.0);
+    ASSERT_EQ(difference[0].inner_rings.size(), 1);
+
+    ASSERT_EQ(symmetric_difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 84.0);
+    ASSERT_EQ(symmetric_difference[0].inner_rings.size(), 1);
 }
 
 TEST(PolygonBooleanTest, BuildsIntersectionOfTwoDonuts) {
