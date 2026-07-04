@@ -184,9 +184,27 @@ add_custom_target(
 
 include(GoogleTest)
 
+set(GEOMETRY_TEST_SOURCES
+    tests/geometry_tests.cpp
+)
+
+set(ALGORITHM_TEST_SOURCES
+    tests/algorithm_tests.cpp
+)
+
+set(GUI_TEST_SOURCES
+    tests/gui_tests.cpp
+)
+
+set(ALL_TEST_SOURCES
+    ${GEOMETRY_TEST_SOURCES}
+    ${ALGORITHM_TEST_SOURCES}
+    ${GUI_TEST_SOURCES}
+)
+
 add_executable(
     geometry_tests
-    tests/geometry_tests.cpp
+    ${GEOMETRY_TEST_SOURCES}
 )
 
 set_target_properties(
@@ -206,7 +224,7 @@ gtest_discover_tests(geometry_tests)
 
 add_executable(
     algorithm_tests
-    tests/algorithm_tests.cpp
+    ${ALGORITHM_TEST_SOURCES}
 )
 
 set_target_properties(
@@ -226,7 +244,7 @@ gtest_discover_tests(algorithm_tests)
 
 add_executable(
     gui_tests
-    tests/gui_tests.cpp
+    ${GUI_TEST_SOURCES}
 )
 
 set_target_properties(
@@ -248,12 +266,32 @@ gtest_discover_tests(
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
 
+add_executable(
+    all_tests
+    ${ALL_TEST_SOURCES}
+)
+
+set_target_properties(
+    all_tests
+    PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tests
+)
+
+target_link_libraries(
+    all_tests
+    PRIVATE
+    gui_core
+    geometry_core
+    GTest::gtest_main
+)
+
 add_custom_target(
     tests
     DEPENDS
     geometry_tests
     algorithm_tests
     gui_tests
+    all_tests
 )
 
 if(DOXYGEN_FOUND)
