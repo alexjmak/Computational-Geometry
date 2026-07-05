@@ -178,9 +178,14 @@ void collectMissingFaceQueries(const DCEL& overlay,
         const DCEL::Face& face = overlay.face(i);
         assert(face.outer_component != DCEL::npos);
         const DCEL::HalfEdge& outer_half_edge = overlay.halfEdge(face.outer_component);
+        const Segment outer_segment = overlay.segmentOf(outer_half_edge);
 
-        LinearRing outer_ring = overlay.ringOf(outer_half_edge);
-        const Point& representative_point = outer_ring.points[0];
+        // Query from a boundary edge midpoint instead of a vertex: point-touching faces can share
+        // vertices with the source DCEL being located. The midpoint is still on this overlay
+        // boundary, but if the edge also lay on the queried source boundary, it would be a shared
+        // edge, and faces with shared edges were already labeled earlier.
+        const Point representative_point =
+            outer_segment.start + (outer_segment.end - outer_segment.start) * Rational(1, 2);
 
         FaceQueries& queries =
             face_label.left_face == DCEL::npos ? left_face_queries : right_face_queries;

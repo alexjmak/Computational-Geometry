@@ -812,7 +812,7 @@ TEST(SegmentOverlayTest, LabelsOpenRightChordAsNonFilledOverlaySplitter) {
     EXPECT_DOUBLE_EQ(counts.left_only_area, 16.0);
 }
 
-TEST(SegmentOverlayTest, DISABLED_LabelsPointTouchingRectanglesAsSeparateInteriors) {
+TEST(SegmentOverlayTest, LabelsPointTouchingRectanglesAsSeparateInteriors) {
     const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(1, 1));
     const std::vector<Segment> right = rectangleSegments(Point(1, 1), Point(2, 2));
 
