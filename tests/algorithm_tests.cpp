@@ -399,19 +399,23 @@ TEST(AssemblePolygonsTest, ReturnsNoPolygonsForEmptySegmentSet) {
     EXPECT_TRUE(assemblePolygons({}).empty());
 }
 
-TEST(AssemblePolygonsTest, CancelsDuplicateBoundaryUnderOddEvenRule) {
+TEST(AssemblePolygonsTest, PreservesDuplicateBoundaryAsSinglePolygon) {
     std::vector<Segment> segments = rectangleSegments(Point(0, 0), Point(4, 4));
     const std::vector<Segment> duplicate_segments = rectangleSegments(Point(0, 0), Point(4, 4));
     appendSegments(segments, duplicate_segments);
 
-    EXPECT_TRUE(assemblePolygons(segments).empty());
+    const std::vector<Polygon> polygons = assemblePolygons(segments);
+    ASSERT_EQ(polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(polygons), 16.0);
 }
 
-TEST(AssemblePolygonsTest, CancelsReversedDuplicateBoundaryUnderOddEvenRule) {
+TEST(AssemblePolygonsTest, PreservesReversedDuplicateBoundaryAsSinglePolygon) {
     std::vector<Segment> segments = rectangleSegments(Point(0, 0), Point(4, 4));
     appendSegments(segments, rectangleHoleSegments(Point(0, 0), Point(4, 4)));
 
-    EXPECT_TRUE(assemblePolygons(segments).empty());
+    const std::vector<Polygon> polygons = assemblePolygons(segments);
+    ASSERT_EQ(polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(polygons), 16.0);
 }
 
 TEST(AssemblePolygonsTest, BuildsTwoRegionsFromSelfCrossingBowtieBoundary) {
@@ -779,7 +783,7 @@ TEST(SegmentOverlayTest, ProducesNoFiniteFacesForTwoEmptyArrangements) {
     EXPECT_TRUE(overlayFacePolygons(overlay).empty());
 }
 
-TEST(SegmentOverlayTest, TreatsDuplicateLeftBoundaryAsExteriorAgainstRightPolygon) {
+TEST(SegmentOverlayTest, TreatsDuplicateLeftBoundaryAsFilledAgainstRightPolygon) {
     std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(4, 4));
     appendSegments(left, rectangleSegments(Point(0, 0), Point(4, 4)));
     const std::vector<Segment> right = rectangleSegments(Point(0, 0), Point(4, 4));
@@ -790,10 +794,10 @@ TEST(SegmentOverlayTest, TreatsDuplicateLeftBoundaryAsExteriorAgainstRightPolygo
     const OverlayBucketCounts counts = countFilledOverlayBuckets(overlay, left_dcel, right_dcel);
 
     EXPECT_EQ(counts.left_only, 0);
-    EXPECT_EQ(counts.right_only, 1);
-    EXPECT_EQ(counts.both, 0);
+    EXPECT_EQ(counts.right_only, 0);
+    EXPECT_EQ(counts.both, 1);
     EXPECT_EQ(counts.neither, 0);
-    EXPECT_DOUBLE_EQ(counts.right_only_area, 16.0);
+    EXPECT_DOUBLE_EQ(counts.both_area, 16.0);
 }
 
 TEST(SegmentOverlayTest, LabelsOpenRightChordAsNonFilledOverlaySplitter) {
@@ -1017,18 +1021,18 @@ TEST(PolygonBooleanTest, AppliesTruthTableWithDuplicateLeftBoundary) {
     const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
     const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
 
-    EXPECT_TRUE(intersection.empty());
+    ASSERT_EQ(intersection.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(intersection), 16.0);
 
     ASSERT_EQ(union_polygons.size(), 1);
     EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 16.0);
 
     EXPECT_TRUE(difference.empty());
 
-    ASSERT_EQ(symmetric_difference.size(), 1);
-    EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 16.0);
+    EXPECT_TRUE(symmetric_difference.empty());
 }
 
-TEST(PolygonBooleanTest, DISABLED_IgnoresOpenRightChordAsZeroAreaInput) {
+TEST(PolygonBooleanTest, IgnoresOpenRightChordAsZeroAreaInput) {
     const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(4, 4));
     const std::vector<Segment> right = {
         Segment(Point(0, 0), Point(4, 4)),

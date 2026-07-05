@@ -189,8 +189,7 @@ void dumpFaceBoundary(const DCEL& dcel, std::size_t face_index) {
             const DCEL::HalfEdge& half_edge = dcel.halfEdge(curr_half_edge);
             debug::dcel() << " edge " << curr_half_edge << " face=" << half_edge.face
                           << " twin=" << half_edge.twin << " next=" << half_edge.next
-                          << " segment=" << dcel.segmentOf(half_edge).toString()
-                          << " boundary_count=" << half_edge.boundary_count << "\n";
+                          << " segment=" << dcel.segmentOf(half_edge).toString() << "\n";
             curr_half_edge = half_edge.next;
         } while (curr_half_edge != component);
     };
@@ -791,9 +790,6 @@ std::size_t DCEL::Creator::getOrCreateHalfEdgePair(const Segment& segment) {
         assert(twin_half_edge.twin == half_edge_index);
     }
 
-    ++half_edge.boundary_count;
-    ++twin_half_edge.boundary_count;
-
     return half_edge_index;
 }
 
@@ -802,8 +798,7 @@ DCEL::DCELPoint::DCELPoint(Rational x, Rational y) : Point(x, y), half_edge(DCEL
 DCEL::DCELPoint::DCELPoint(const Point& p) : Point(p), half_edge(DCEL::npos) {}
 
 DCEL::HalfEdge::HalfEdge(std::size_t origin)
-    : origin(origin), twin(DCEL::npos), next(DCEL::npos), prev(DCEL::npos), face(DCEL::npos),
-      boundary_count(0) {}
+    : origin(origin), twin(DCEL::npos), next(DCEL::npos), prev(DCEL::npos), face(DCEL::npos) {}
 
 DCEL::Face::Face() : outer_component(DCEL::npos), inner_components() {}
 
@@ -930,7 +925,9 @@ std::vector<DCEL::FaceParity> DCEL::faceParities() const {
     face_parities[unbounded_face_index] = FaceParity::Exterior;
 
     // Traverse the face-adjacency graph from the unbounded face using BFS.
-    // Crossing a boundary through a half-edge twin flips the fill parity.
+    // Crossing into an unvisited face through a half-edge twin flips the fill parity.
+    // If an already visited face would receive a conflicting parity, leave it unchanged. This can
+    // happen at non-boundary internal edges, such as a filled square split by a diagonal chord.
     std::queue<std::size_t> queue;
     queue.push(unbounded_face_index);
 
@@ -942,27 +939,20 @@ std::vector<DCEL::FaceParity> DCEL::faceParities() const {
 
             const Face& face = faces[face_index];
             const FaceParity parity = face_parities[face_index];
+            const FaceParity adjacent_parity = oppositeFaceParity(parity);
 
             auto visit_boundary_component = [&](std::size_t component) {
                 std::size_t curr_half_edge = component;
                 do {
                     const HalfEdge& half_edge = half_edges[curr_half_edge];
                     const HalfEdge& twin_half_edge = twinOf(half_edge);
-                    const FaceParity adjacent_parity =
-                        half_edge.boundary_count % 2 == 1 ? oppositeFaceParity(parity) : parity;
+
                     const std::size_t adjacent_face = twin_half_edge.face;
                     assert(adjacent_face != npos);
 
                     if (face_parities[adjacent_face] == FaceParity::Unknown) {
                         face_parities[adjacent_face] = adjacent_parity;
                         queue.push(adjacent_face);
-                    } else {
-                        if (face_parities[adjacent_face] != adjacent_parity &&
-                            debug::dcelEnabled()) {
-                            dumpFaceParityConflict(*this, face_parities, face_index, adjacent_face,
-                                                   curr_half_edge, adjacent_parity);
-                        }
-                        assert(face_parities[adjacent_face] == adjacent_parity);
                     }
 
                     curr_half_edge = half_edge.next;
@@ -976,6 +966,10 @@ std::vector<DCEL::FaceParity> DCEL::faceParities() const {
                 visit_boundary_component(component);
             }
         }
+    }
+
+    for (const FaceParity face_parity : face_parities) {
+        assert(face_parity != FaceParity::Unknown);
     }
 
     return face_parities;

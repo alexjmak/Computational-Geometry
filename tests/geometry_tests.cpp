@@ -247,19 +247,25 @@ TEST(DCELTest, CreatesOnlyUnboundedFaceForEmptySegmentSet) {
     EXPECT_EQ(face_parities[DCEL::unbounded_face_index], DCEL::FaceParity::Exterior);
 }
 
-TEST(DCELTest, TreatsDuplicateBoundaryAsExteriorUnderOddEvenParity) {
+TEST(DCELTest, TreatsDuplicateBoundaryAsSingleFilledRegion) {
     const Polygon polygon(Rectangle(Point(0, 0), Point(4, 4)).ring());
     const DCEL dcel = DCEL::fromSegments(toSegments({polygon, polygon}));
 
     const std::vector<DCEL::FaceParity> face_parities = dcel.faceParities();
 
     ASSERT_EQ(face_parities.size(), dcel.faceCount());
-    for (const DCEL::FaceParity face_parity : face_parities) {
-        EXPECT_EQ(face_parity, DCEL::FaceParity::Exterior);
+    EXPECT_EQ(face_parities[DCEL::unbounded_face_index], DCEL::FaceParity::Exterior);
+
+    std::size_t interior_faces = 0;
+    for (std::size_t i = 0; i < face_parities.size(); ++i) {
+        if (face_parities[i] == DCEL::FaceParity::Interior) {
+            ++interior_faces;
+        }
     }
+    EXPECT_EQ(interior_faces, 1);
 }
 
-TEST(DCELTest, TreatsReversedDuplicateBoundaryAsExteriorUnderOddEvenParity) {
+TEST(DCELTest, TreatsReversedDuplicateBoundaryAsSingleFilledRegion) {
     const std::vector<Segment> segments = {
         Segment(Point(0, 0), Point(4, 0)), Segment(Point(4, 0), Point(4, 4)),
         Segment(Point(4, 4), Point(0, 4)), Segment(Point(0, 4), Point(0, 0)),
@@ -271,9 +277,15 @@ TEST(DCELTest, TreatsReversedDuplicateBoundaryAsExteriorUnderOddEvenParity) {
     const std::vector<DCEL::FaceParity> face_parities = dcel.faceParities();
 
     ASSERT_EQ(face_parities.size(), dcel.faceCount());
-    for (const DCEL::FaceParity face_parity : face_parities) {
-        EXPECT_EQ(face_parity, DCEL::FaceParity::Exterior);
+    EXPECT_EQ(face_parities[DCEL::unbounded_face_index], DCEL::FaceParity::Exterior);
+
+    std::size_t interior_faces = 0;
+    for (std::size_t i = 0; i < face_parities.size(); ++i) {
+        if (face_parities[i] == DCEL::FaceParity::Interior) {
+            ++interior_faces;
+        }
     }
+    EXPECT_EQ(interior_faces, 1);
 }
 
 TEST(DCELTest, CreatesFacesForDonutWithIsland) {
@@ -387,17 +399,17 @@ TEST(DCELTest, KeepsSharedEdgeFacesInteriorAcrossEvenBoundary) {
     }
     EXPECT_EQ(interior_faces, 2);
 
-    std::size_t shared_even_boundaries = 0;
+    std::size_t shared_interior_half_edges = 0;
     for (std::size_t i = 0; i < dcel.halfEdgeCount(); ++i) {
         const DCEL::HalfEdge& half_edge = dcel.halfEdge(i);
         const Segment segment = dcel.segmentOf(half_edge);
         if (((segment.start == Point(1, 0) && segment.end == Point(1, 1)) ||
-             (segment.start == Point(1, 1) && segment.end == Point(1, 0))) &&
-            half_edge.boundary_count == 2) {
-            ++shared_even_boundaries;
+             (segment.start == Point(1, 1) && segment.end == Point(1, 0)))) {
+            EXPECT_EQ(face_parities[half_edge.face], DCEL::FaceParity::Interior);
+            ++shared_interior_half_edges;
         }
     }
-    EXPECT_EQ(shared_even_boundaries, 2);
+    EXPECT_EQ(shared_interior_half_edges, 2);
 }
 
 TEST(DCELTest, SplitsPartialSharedEdgeAndKeepsFacesInterior) {
@@ -418,20 +430,20 @@ TEST(DCELTest, SplitsPartialSharedEdgeAndKeepsFacesInterior) {
     }
     EXPECT_EQ(interior_faces, 2);
 
-    std::size_t shared_even_boundaries = 0;
+    std::size_t shared_interior_half_edges = 0;
     for (std::size_t i = 0; i < dcel.halfEdgeCount(); ++i) {
         const DCEL::HalfEdge& half_edge = dcel.halfEdge(i);
         const Segment segment = dcel.segmentOf(half_edge);
         if (((segment.start == Point(2, 4) && segment.end == Point(4, 4)) ||
-             (segment.start == Point(4, 4) && segment.end == Point(2, 4))) &&
-            half_edge.boundary_count == 2) {
-            ++shared_even_boundaries;
+             (segment.start == Point(4, 4) && segment.end == Point(2, 4)))) {
+            EXPECT_EQ(face_parities[half_edge.face], DCEL::FaceParity::Interior);
+            ++shared_interior_half_edges;
         }
     }
-    EXPECT_EQ(shared_even_boundaries, 2);
+    EXPECT_EQ(shared_interior_half_edges, 2);
 }
 
-TEST(DCELTest, DISABLED_IgnoresInteriorChordWhenClassifyingSquareParity) {
+TEST(DCELTest, IgnoresInteriorChordWhenClassifyingSquareParity) {
     const std::vector<Segment> segments = {
         Segment(Point(0, 0), Point(4, 0)), Segment(Point(4, 0), Point(4, 4)),
         Segment(Point(4, 4), Point(0, 4)), Segment(Point(0, 4), Point(0, 0)),
@@ -457,7 +469,7 @@ TEST(DCELTest, DISABLED_IgnoresInteriorChordWhenClassifyingSquareParity) {
         interior_area += polygon->area();
     }
 
-    EXPECT_EQ(interior_faces, 1);
+    EXPECT_EQ(interior_faces, 2);
     EXPECT_DOUBLE_EQ(interior_area, 16.0);
 }
 
