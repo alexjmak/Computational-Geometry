@@ -224,7 +224,7 @@ TEST(ConvexHullTest, KeepsOnlyEndpointsForCollinearPoints) {
     EXPECT_EQ(hull.points, std::vector<Point>({Point(0, 0), Point(3, 0)}));
 }
 
-TEST(ConvexHullTest, DISABLED_PreservesSingletonPoint) {
+TEST(ConvexHullTest, PreservesSingletonPoint) {
     const std::vector<Point> points = {Point(2, 3)};
 
     const LinearRing hull = convexHull(points);
