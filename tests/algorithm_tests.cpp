@@ -442,7 +442,7 @@ TEST(AssemblePolygonsTest, KeepsPointTouchingRectanglesAsSeparatePolygons) {
     EXPECT_DOUBLE_EQ(totalPolygonArea(polygons), 2.0);
 }
 
-TEST(AssemblePolygonsTest, DISABLED_MergesSharedEdgeRectanglesIntoOnePolygon) {
+TEST(AssemblePolygonsTest, MergesSharedEdgeRectanglesIntoOnePolygon) {
     std::vector<Segment> segments = rectangleSegments(Point(0, 0), Point(1, 1));
     appendSegments(segments, rectangleSegments(Point(1, 0), Point(2, 1)));
 
@@ -453,7 +453,7 @@ TEST(AssemblePolygonsTest, DISABLED_MergesSharedEdgeRectanglesIntoOnePolygon) {
     EXPECT_TRUE(polygons[0].inner_rings.empty());
 }
 
-TEST(AssemblePolygonsTest, DISABLED_MergesPartiallySharedEdgeRectanglesIntoOnePolygon) {
+TEST(AssemblePolygonsTest, MergesPartiallySharedEdgeRectanglesIntoOnePolygon) {
     std::vector<Segment> segments = rectangleSegments(Point(0, 0), Point(4, 4));
     appendSegments(segments, rectangleSegments(Point(2, 4), Point(6, 6)));
 
@@ -464,9 +464,33 @@ TEST(AssemblePolygonsTest, DISABLED_MergesPartiallySharedEdgeRectanglesIntoOnePo
     EXPECT_TRUE(polygons[0].inner_rings.empty());
 }
 
-TEST(AssemblePolygonsTest, DISABLED_IgnoresInteriorChordAcrossSquare) {
+TEST(AssemblePolygonsTest, IgnoresInteriorChordAcrossSquare) {
     std::vector<Segment> segments = rectangleSegments(Point(0, 0), Point(4, 4));
     segments.emplace_back(Point(0, 0), Point(4, 4));
+
+    const std::vector<Polygon> polygons = assemblePolygons(segments);
+
+    ASSERT_EQ(polygons.size(), 1);
+    EXPECT_EQ(polygons[0].outer_ring.points.size(), 4);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(polygons), 16.0);
+    EXPECT_TRUE(polygons[0].inner_rings.empty());
+}
+
+TEST(AssemblePolygonsTest, IgnoresFreeSegmentOutsideSquare) {
+    std::vector<Segment> segments = rectangleSegments(Point(0, 0), Point(4, 4));
+    segments.emplace_back(Point(6, 1), Point(8, 3));
+
+    const std::vector<Polygon> polygons = assemblePolygons(segments);
+
+    ASSERT_EQ(polygons.size(), 1);
+    EXPECT_EQ(polygons[0].outer_ring.points.size(), 4);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(polygons), 16.0);
+    EXPECT_TRUE(polygons[0].inner_rings.empty());
+}
+
+TEST(AssemblePolygonsTest, IgnoresDanglingSegmentAttachedToSquare) {
+    std::vector<Segment> segments = rectangleSegments(Point(0, 0), Point(4, 4));
+    segments.emplace_back(Point(4, 2), Point(6, 2));
 
     const std::vector<Polygon> polygons = assemblePolygons(segments);
 
@@ -1119,7 +1143,7 @@ TEST(PolygonBooleanTest, AppliesTruthTableToIdenticalRectangles) {
     EXPECT_TRUE(symmetric_difference.empty());
 }
 
-TEST(PolygonBooleanTest, DISABLED_AppliesTruthTableToPointTouchingRectangles) {
+TEST(PolygonBooleanTest, AppliesTruthTableToPointTouchingRectangles) {
     const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(1, 1));
     const std::vector<Segment> right = rectangleSegments(Point(1, 1), Point(2, 2));
 
