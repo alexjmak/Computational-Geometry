@@ -232,6 +232,22 @@ TEST(ConvexHullTest, PreservesSingletonPoint) {
     EXPECT_EQ(hull.points, std::vector<Point>({Point(2, 3)}));
 }
 
+TEST(ConvexHullTest, DeduplicatesRepeatedSingletonPoint) {
+    const std::vector<Point> points = {Point(2, 3), Point(2, 3), Point(2, 3)};
+
+    const LinearRing hull = convexHull(points);
+
+    EXPECT_EQ(hull.points, std::vector<Point>({Point(2, 3)}));
+}
+
+TEST(ConvexHullTest, PreservesTwoUniquePoints) {
+    const std::vector<Point> points = {Point(2, 3), Point(5, 7), Point(2, 3)};
+
+    const LinearRing hull = convexHull(points);
+
+    EXPECT_EQ(hull.points, std::vector<Point>({Point(2, 3), Point(5, 7)}));
+}
+
 TEST(ConvexHullTest, SlowAndFastHullUseSameBoundaryPoints) {
     const std::vector<Point> points = {Point(0, 0), Point(2, 0), Point(2, 2),
                                        Point(0, 2), Point(1, 1), Point(1, 0)};
@@ -320,6 +336,18 @@ TEST(AssembleRingsTest, IgnoresDanglingChainAttachedToRing) {
     EXPECT_DOUBLE_EQ(rings[0].area(), 1.0);
     EXPECT_EQ(pointSet(rings[0].points),
               pointSet({Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1)}));
+}
+
+TEST(AssembleRingsTest, BuildsPointTouchingRingsSeparately) {
+    std::vector<Segment> segments = rectangleSegments(Point(0, 0), Point(1, 1));
+    appendSegments(segments, rectangleSegments(Point(1, 1), Point(2, 2)));
+
+    const std::vector<LinearRing> rings = assembleRings(segments);
+
+    ASSERT_EQ(rings.size(), 2);
+    EXPECT_DOUBLE_EQ(rings[0].area() + rings[1].area(), 2.0);
+    EXPECT_EQ(rings[0].points.size(), 4);
+    EXPECT_EQ(rings[1].points.size(), 4);
 }
 
 TEST(AssemblePolygonsTest, BuildsDonutWithIsland) {
@@ -499,6 +527,55 @@ TEST(AssemblePolygonsTest, IgnoresDanglingSegmentAttachedToSquare) {
     EXPECT_TRUE(polygons[0].inner_rings.empty());
 }
 
+TEST(AssemblePolygonsTest, DISABLED_RemovesDanglingAttachmentVertexFromSquareBoundary) {
+    std::vector<Segment> segments = rectangleSegments(Point(0, 0), Point(4, 4));
+    segments.emplace_back(Point(4, 2), Point(6, 2));
+
+    const std::vector<Polygon> polygons = assemblePolygons(segments);
+
+    ASSERT_EQ(polygons.size(), 1);
+    EXPECT_EQ(polygons[0].outer_ring.points.size(), 4);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(polygons), 16.0);
+    EXPECT_TRUE(polygons[0].inner_rings.empty());
+}
+
+TEST(AssemblePolygonsTest, IgnoresFreeSegmentInsideSquare) {
+    std::vector<Segment> segments = rectangleSegments(Point(0, 0), Point(4, 4));
+    segments.emplace_back(Point(1, 1), Point(3, 3));
+
+    const std::vector<Polygon> polygons = assemblePolygons(segments);
+
+    ASSERT_EQ(polygons.size(), 1);
+    EXPECT_EQ(polygons[0].outer_ring.points.size(), 4);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(polygons), 16.0);
+    EXPECT_TRUE(polygons[0].inner_rings.empty());
+}
+
+TEST(AssemblePolygonsTest, IgnoresDanglingSegmentInsideSquare) {
+    std::vector<Segment> segments = rectangleSegments(Point(0, 0), Point(4, 4));
+    segments.emplace_back(Point(1, 1), Point(3, 1));
+
+    const std::vector<Polygon> polygons = assemblePolygons(segments);
+
+    ASSERT_EQ(polygons.size(), 1);
+    EXPECT_EQ(polygons[0].outer_ring.points.size(), 4);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(polygons), 16.0);
+    EXPECT_TRUE(polygons[0].inner_rings.empty());
+}
+
+TEST(AssemblePolygonsTest, IgnoresMultipleInteriorChordsAcrossSquare) {
+    std::vector<Segment> segments = rectangleSegments(Point(0, 0), Point(4, 4));
+    segments.emplace_back(Point(0, 0), Point(4, 4));
+    segments.emplace_back(Point(0, 4), Point(4, 0));
+
+    const std::vector<Polygon> polygons = assemblePolygons(segments);
+
+    ASSERT_EQ(polygons.size(), 1);
+    EXPECT_EQ(polygons[0].outer_ring.points.size(), 4);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(polygons), 16.0);
+    EXPECT_TRUE(polygons[0].inner_rings.empty());
+}
+
 TEST(LineSegmentIntersectionTest, FindsSingleCrossingPoint) {
     const std::vector<Segment> segments = {
         Segment(Point(0, 0), Point(4, 4)),
@@ -526,6 +603,43 @@ TEST(LineSegmentIntersectionTest, ReportsOverlapEndpoints) {
     };
 
     expectIntersections(segments, {Point(2, 0), Point(4, 0)});
+}
+
+TEST(LineSegmentIntersectionTest, ReportsEndpointsForVerticalCollinearOverlap) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(0, 6)),
+        Segment(Point(0, 2), Point(0, 4)),
+    };
+
+    expectIntersections(segments, {Point(0, 2), Point(0, 4)});
+}
+
+TEST(LineSegmentIntersectionTest, ReportsEndpointsForDiagonalCollinearOverlap) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(6, 6)),
+        Segment(Point(2, 2), Point(4, 4)),
+    };
+
+    expectIntersections(segments, {Point(2, 2), Point(4, 4)});
+}
+
+TEST(LineSegmentIntersectionTest, DeduplicatesOverlappingChainEndpoints) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(4, 0)),
+        Segment(Point(2, 0), Point(6, 0)),
+        Segment(Point(4, 0), Point(8, 0)),
+    };
+
+    expectIntersections(segments, {Point(2, 0), Point(4, 0), Point(6, 0)});
+}
+
+TEST(LineSegmentIntersectionTest, ReportsRationalCrossingPoint) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(3, 2)),
+        Segment(Point(0, 2), Point(3, 0)),
+    };
+
+    expectIntersections(segments, {Point(Rational(3, 2), 1)});
 }
 
 TEST(LineSegmentIntersectionTest, GroupsSortedIntersectionPointsBySegment) {
@@ -562,6 +676,22 @@ TEST(LineSegmentIntersectionTest, GroupsIntersectionPointsInOriginalSegmentDirec
     EXPECT_EQ(intersections[2], std::vector<Point>({Point(2, 0)}));
 }
 
+TEST(LineSegmentIntersectionTest, GroupsDiagonalIntersectionsInOriginalSegmentDirection) {
+    const std::vector<Segment> segments = {
+        Segment(Point(6, 6), Point(0, 0)),
+        Segment(Point(4, 0), Point(4, 6)),
+        Segment(Point(2, 0), Point(2, 6)),
+    };
+
+    const std::vector<std::vector<Point>> intersections =
+        lineSegmentIntersectionBySegments(segments);
+
+    ASSERT_EQ(intersections.size(), segments.size());
+    EXPECT_EQ(intersections[0], std::vector<Point>({Point(4, 4), Point(2, 2)}));
+    EXPECT_EQ(intersections[1], std::vector<Point>({Point(4, 4)}));
+    EXPECT_EQ(intersections[2], std::vector<Point>({Point(2, 2)}));
+}
+
 TEST(LineSegmentIntersectionTest, KeepsDuplicateSegmentsDistinctInternally) {
     const std::vector<Segment> segments = {
         Segment(Point(0, 0), Point(4, 0)),
@@ -588,6 +718,48 @@ TEST(LineSegmentIntersectionTest, IgnoresDegenerateSegments) {
     };
 
     expectIntersections(segments, {Point(2, 2)});
+}
+
+TEST(LineSegmentIntersectionTest, HandlesManySegmentsSharingOneEndpoint) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(4, 0)),
+        Segment(Point(0, 0), Point(0, 4)),
+        Segment(Point(0, 0), Point(4, 4)),
+        Segment(Point(0, 0), Point(4, 2)),
+    };
+
+    expectIntersections(segments, {Point(0, 0)});
+}
+
+TEST(LineSegmentIntersectionTest, DeduplicatesSeveralIntersectionsAtSamePoint) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(4, 4)),
+        Segment(Point(0, 4), Point(4, 0)),
+        Segment(Point(2, -1), Point(2, 5)),
+        Segment(Point(-1, 2), Point(5, 2)),
+    };
+
+    expectIntersections(segments, {Point(2, 2)});
+}
+
+TEST(LineSegmentIntersectionTest, HandlesDuplicateReversedSegmentAndCrossingSegment) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(4, 0)),
+        Segment(Point(4, 0), Point(0, 0)),
+        Segment(Point(2, -1), Point(2, 1)),
+    };
+
+    expectIntersections(segments, {Point(0, 0), Point(2, 0), Point(4, 0)});
+}
+
+TEST(LineSegmentIntersectionTest, ReportsEndpointsForContainedCollinearOverlap) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(6, 0)),
+        Segment(Point(2, 0), Point(4, 0)),
+        Segment(Point(3, -1), Point(3, 1)),
+    };
+
+    expectIntersections(segments, {Point(2, 0), Point(3, 0), Point(4, 0)});
 }
 
 TEST(LeftRayQueryTest, FindsNearestSegmentStrictlyLeftOfQuery) {
@@ -744,6 +916,39 @@ TEST(PlanarizeSegmentsTest, SplitsCrossingSegmentsAtIntersection) {
                                Segment(Point(0, 4), Point(2, 2)),
                                Segment(Point(2, 2), Point(4, 0)),
                            }));
+}
+
+TEST(PlanarizeSegmentsTest, SplitsContainedCollinearOverlapIntoAtomicSegments) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(6, 0)),
+        Segment(Point(2, 0), Point(4, 0)),
+    };
+
+    const std::vector<Segment> planarized = planarizeSegments(segments);
+
+    expectSegmentSetsEqual("planarizeSegments", segmentSet(planarized),
+                           segmentSet({
+                               Segment(Point(0, 0), Point(2, 0)),
+                               Segment(Point(2, 0), Point(4, 0)),
+                               Segment(Point(4, 0), Point(6, 0)),
+                           }));
+}
+
+TEST(PlanarizeSegmentsTest, PreservesOverlappingCoverageMultiplicity) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(6, 0)),
+        Segment(Point(2, 0), Point(4, 0)),
+    };
+
+    const std::vector<Segment> planarized = planarizeSegments(segments);
+
+    EXPECT_EQ(std::count(planarized.begin(), planarized.end(), Segment(Point(0, 0), Point(2, 0))),
+              1);
+    EXPECT_EQ(std::count(planarized.begin(), planarized.end(), Segment(Point(2, 0), Point(4, 0))),
+              2);
+    EXPECT_EQ(std::count(planarized.begin(), planarized.end(), Segment(Point(4, 0), Point(6, 0))),
+              1);
+    EXPECT_EQ(planarized.size(), 4);
 }
 
 TEST(SegmentOverlayTest, LabelsContainedPolygonShowcaseFaces) {
@@ -1056,10 +1261,101 @@ TEST(PolygonBooleanTest, AppliesTruthTableWithDuplicateLeftBoundary) {
     EXPECT_TRUE(symmetric_difference.empty());
 }
 
+TEST(PolygonBooleanTest, AppliesTruthTableWithDuplicateBoundaryOnBothSides) {
+    std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(4, 4));
+    appendSegments(left, rectangleSegments(Point(0, 0), Point(4, 4)));
+    std::vector<Segment> right = rectangleSegments(Point(0, 0), Point(4, 4));
+    appendSegments(right, rectangleSegments(Point(0, 0), Point(4, 4)));
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    ASSERT_EQ(intersection.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(intersection), 16.0);
+
+    ASSERT_EQ(union_polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 16.0);
+
+    EXPECT_TRUE(difference.empty());
+    EXPECT_TRUE(symmetric_difference.empty());
+}
+
 TEST(PolygonBooleanTest, IgnoresOpenRightChordAsZeroAreaInput) {
     const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(4, 4));
     const std::vector<Segment> right = {
         Segment(Point(0, 0), Point(4, 4)),
+    };
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    EXPECT_TRUE(intersection.empty());
+
+    ASSERT_EQ(union_polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 16.0);
+
+    ASSERT_EQ(difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(difference), 16.0);
+
+    ASSERT_EQ(symmetric_difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 16.0);
+}
+
+TEST(PolygonBooleanTest, IgnoresOpenRightVerticalChordAsZeroAreaInput) {
+    const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(4, 4));
+    const std::vector<Segment> right = {
+        Segment(Point(2, 0), Point(2, 4)),
+    };
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    EXPECT_TRUE(intersection.empty());
+
+    ASSERT_EQ(union_polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 16.0);
+
+    ASSERT_EQ(difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(difference), 16.0);
+
+    ASSERT_EQ(symmetric_difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 16.0);
+}
+
+TEST(PolygonBooleanTest, IgnoresOpenRightHorizontalChordAsZeroAreaInput) {
+    const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(4, 4));
+    const std::vector<Segment> right = {
+        Segment(Point(0, 2), Point(4, 2)),
+    };
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    EXPECT_TRUE(intersection.empty());
+
+    ASSERT_EQ(union_polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 16.0);
+
+    ASSERT_EQ(difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(difference), 16.0);
+
+    ASSERT_EQ(symmetric_difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 16.0);
+}
+
+TEST(PolygonBooleanTest, IgnoresOpenRightPolylineAsZeroAreaInput) {
+    const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(4, 4));
+    const std::vector<Segment> right = {
+        Segment(Point(1, 1), Point(3, 1)),
+        Segment(Point(3, 1), Point(3, 3)),
     };
 
     const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
@@ -1127,6 +1423,25 @@ TEST(PolygonBooleanTest, AppliesTruthTableToContainedRectangles) {
 TEST(PolygonBooleanTest, AppliesTruthTableToIdenticalRectangles) {
     const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(4, 4));
     const std::vector<Segment> right = rectangleSegments(Point(0, 0), Point(4, 4));
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    ASSERT_EQ(intersection.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(intersection), 16.0);
+
+    ASSERT_EQ(union_polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 16.0);
+
+    EXPECT_TRUE(difference.empty());
+    EXPECT_TRUE(symmetric_difference.empty());
+}
+
+TEST(PolygonBooleanTest, AppliesTruthTableToIdenticalReversedRectangles) {
+    const std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(4, 4));
+    const std::vector<Segment> right = rectangleHoleSegments(Point(0, 0), Point(4, 4));
 
     const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
     const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
@@ -1271,6 +1586,57 @@ TEST(PolygonBooleanTest, AppliesTruthTableToPolygonInsideHole) {
 
     ASSERT_EQ(symmetric_difference.size(), 2);
     EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 88.0);
+}
+
+TEST(PolygonBooleanTest, AppliesTruthTableToPolygonPointTouchingHoleBoundary) {
+    std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(10, 10));
+    appendSegments(left, rectangleHoleSegments(Point(3, 3), Point(7, 7)));
+    const std::vector<Segment> right = ringSegments({
+        Point(7, 7),
+        Point(6, Rational(13, 2)),
+        Point(Rational(11, 2), 6),
+        Point(Rational(13, 2), Rational(11, 2)),
+    });
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    EXPECT_TRUE(intersection.empty());
+
+    ASSERT_EQ(union_polygons.size(), 2);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 85.0);
+
+    ASSERT_EQ(difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(difference), 84.0);
+    ASSERT_EQ(difference[0].inner_rings.size(), 1);
+
+    ASSERT_EQ(symmetric_difference.size(), 2);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 85.0);
+}
+
+TEST(PolygonBooleanTest, AppliesTruthTableToPolygonSharingHoleBoundaryEdges) {
+    std::vector<Segment> left = rectangleSegments(Point(0, 0), Point(10, 10));
+    appendSegments(left, rectangleHoleSegments(Point(3, 3), Point(7, 7)));
+    const std::vector<Segment> right = rectangleSegments(Point(6, 6), Point(7, 7));
+
+    const std::vector<Polygon> intersection = assemblePolygons(polygonAnd(left, right));
+    const std::vector<Polygon> union_polygons = assemblePolygons(polygonOr(left, right));
+    const std::vector<Polygon> difference = assemblePolygons(polygonDifference(left, right));
+    const std::vector<Polygon> symmetric_difference = assemblePolygons(polygonXor(left, right));
+
+    EXPECT_TRUE(intersection.empty());
+
+    ASSERT_EQ(union_polygons.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(union_polygons), 85.0);
+
+    ASSERT_EQ(difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(difference), 84.0);
+    ASSERT_EQ(difference[0].inner_rings.size(), 1);
+
+    ASSERT_EQ(symmetric_difference.size(), 1);
+    EXPECT_DOUBLE_EQ(totalPolygonArea(symmetric_difference), 85.0);
 }
 
 TEST(PolygonBooleanTest, AppliesTruthTableToRectangleCrossingHoleBoundary) {

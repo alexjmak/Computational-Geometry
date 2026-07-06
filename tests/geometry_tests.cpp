@@ -101,6 +101,28 @@ TEST(IntersectionTest, HorizontalRaysHitNearestHorizontalEndpoint) {
     EXPECT_EQ(leftRayIntersection(segment, Point(5, 0)), Point(4, 0));
 }
 
+TEST(IntersectionTest, HorizontalRaysIgnoreOriginOnHorizontalSegment) {
+    const Segment segment(Point(0, 0), Point(4, 0));
+
+    EXPECT_EQ(rightRayIntersection(segment, Point(2, 0)), std::nullopt);
+    EXPECT_EQ(leftRayIntersection(segment, Point(2, 0)), std::nullopt);
+}
+
+TEST(IntersectionTest, HorizontalRaysHandleReversedHorizontalSegment) {
+    const Segment segment(Point(4, 0), Point(0, 0));
+
+    EXPECT_EQ(rightRayIntersection(segment, Point(-1, 0)), Point(0, 0));
+    EXPECT_EQ(leftRayIntersection(segment, Point(5, 0)), Point(4, 0));
+}
+
+TEST(IntersectionTest, ClassifiesCollinearEndpointTouchAsPoint) {
+    const Segment left(Point(0, 0), Point(4, 0));
+    const Segment right(Point(4, 0), Point(6, 0));
+
+    EXPECT_EQ(intersectionType(left, right), IntersectionType::Point);
+    EXPECT_EQ(intersectionPoint(left, right), Point(4, 0));
+}
+
 TEST(LinearRingTest, ComputesSignedAreaOrientationAndSegments) {
     const LinearRing outer({Point(0, 0), Point(2, 0), Point(2, 2), Point(0, 2)});
     const LinearRing inner({Point(0, 0), Point(0, 2), Point(2, 2), Point(2, 0)});
@@ -471,6 +493,36 @@ TEST(DCELTest, IgnoresInteriorChordWhenClassifyingSquareParity) {
     }
 
     EXPECT_EQ(interior_faces, 2);
+    EXPECT_DOUBLE_EQ(interior_area, 16.0);
+}
+
+TEST(DCELTest, IgnoresCrossingInteriorChordsWhenClassifyingSquareParity) {
+    const std::vector<Segment> segments = {
+        Segment(Point(0, 0), Point(4, 0)), Segment(Point(4, 0), Point(4, 4)),
+        Segment(Point(4, 4), Point(0, 4)), Segment(Point(0, 4), Point(0, 0)),
+        Segment(Point(0, 0), Point(4, 4)), Segment(Point(0, 4), Point(4, 0)),
+    };
+    const DCEL dcel = DCEL::fromSegments(segments);
+
+    const std::vector<DCEL::FaceParity> face_parities = dcel.faceParities();
+
+    ASSERT_EQ(face_parities.size(), dcel.faceCount());
+    EXPECT_EQ(face_parities[DCEL::unbounded_face_index], DCEL::FaceParity::Exterior);
+
+    std::size_t interior_faces = 0;
+    double interior_area = 0.0;
+    for (std::size_t i = 0; i < dcel.faceCount(); ++i) {
+        if (face_parities[i] != DCEL::FaceParity::Interior) {
+            continue;
+        }
+
+        ++interior_faces;
+        const std::optional<Polygon> polygon = dcel.polygonOf(dcel.face(i));
+        ASSERT_TRUE(polygon.has_value());
+        interior_area += polygon->area();
+    }
+
+    EXPECT_EQ(interior_faces, 4);
     EXPECT_DOUBLE_EQ(interior_area, 16.0);
 }
 
