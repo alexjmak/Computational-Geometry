@@ -94,10 +94,11 @@ TEST(IntersectionTest, IntersectsSegmentAtY) {
     EXPECT_EQ(intersectAtY(Segment(Point(0, 0), Point(4, 4)), Point(0, 5)), std::nullopt);
 }
 
-TEST(IntersectionTest, DISABLED_RightRayHitsNearestHorizontalEndpoint) {
+TEST(IntersectionTest, HorizontalRaysHitNearestHorizontalEndpoint) {
     const Segment segment(Point(0, 0), Point(4, 0));
 
     EXPECT_EQ(rightRayIntersection(segment, Point(-1, 0)), Point(0, 0));
+    EXPECT_EQ(leftRayIntersection(segment, Point(5, 0)), Point(4, 0));
 }
 
 TEST(LinearRingTest, ComputesSignedAreaOrientationAndSegments) {

@@ -73,8 +73,11 @@ std::optional<Point> intersectAtY(const Segment& s, const Point& p) {
         return std::nullopt;
     }
     if (cs.start.y == cs.end.y) {
-        if (p.x > cs.start.x || p.x < cs.end.x) {
+        if (p.x > cs.start.x) {
             return cs.start;
+        }
+        if (p.x < cs.end.x) {
+            return cs.end;
         }
         return p;
     }
