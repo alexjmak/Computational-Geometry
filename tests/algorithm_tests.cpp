@@ -527,7 +527,7 @@ TEST(AssemblePolygonsTest, IgnoresDanglingSegmentAttachedToSquare) {
     EXPECT_TRUE(polygons[0].inner_rings.empty());
 }
 
-TEST(AssemblePolygonsTest, DISABLED_RemovesDanglingAttachmentVertexFromSquareBoundary) {
+TEST(AssemblePolygonsTest, RemovesDanglingAttachmentVertexFromSquareBoundary) {
     std::vector<Segment> segments = rectangleSegments(Point(0, 0), Point(4, 4));
     segments.emplace_back(Point(4, 2), Point(6, 2));
 

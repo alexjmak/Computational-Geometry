@@ -36,6 +36,11 @@ class LinearRing final : public Ring {
     /// \param points The points that define the closed ring boundary.
     LinearRing(std::vector<Point> points);
 
+    /// \brief Check whether two rings contain the same ordered vertices.
+    /// \param other The ring to compare against.
+    /// \returns True when both rings have identical point order.
+    bool operator==(const LinearRing& other) const;
+
     /// \brief Reverse the point order of the ring. This changes the ring orientation and negates
     /// the signed area so outer rings become inner and vice versa.
     void reverse() override;
@@ -49,10 +54,10 @@ class LinearRing final : public Ring {
     /// \returns A list of segments connecting consecutive points in the ring.
     std::vector<Segment> segments() const;
 
-    /// \brief Check whether two rings contain the same ordered vertices.
-    /// \param other The ring to compare against.
-    /// \returns True when both rings have identical point order.
-    bool operator==(const LinearRing& other) const;
+    /// \brief Remove collinear vertices from the ring.
+    /// \details This modifies the ring in-place, removing any vertex that is collinear with its two
+    /// neighbors.
+    void removeCollinearVertices();
 };
 
 /// \brief Polygon represented by an outer boundary and optional inner hole rings.
@@ -82,6 +87,10 @@ class Polygon {
     /// \param other The polygon to compare against.
     /// \returns True when both polygons have identical ring order and vertices.
     bool operator==(const Polygon& other) const;
+
+    /// \brief Remove collinear vertices from every boundary ring.
+    /// \details This modifies the polygon in-place, simplifying its outer boundary and holes.
+    void removeCollinearVertices();
 };
 
 /// \brief Convert polygon boundaries into directed segments.

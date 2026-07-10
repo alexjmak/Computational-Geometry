@@ -45,6 +45,29 @@ void LinearRing::reverse() {
     std::reverse(points.begin(), points.end());
 }
 
+void LinearRing::removeCollinearVertices() {
+    if (points.size() < 3) {
+        return;
+    }
+
+    std::vector<Point> new_points;
+    new_points.reserve(points.size());
+
+    Point prev = points.back();
+    Point current = points.front();
+    for (std::size_t i = 1; i <= points.size(); ++i) {
+        const Point& next = points[i % points.size()];
+        const bool is_collinear = orientation(prev, current, next) == 0;
+        if (!is_collinear) {
+            new_points.push_back(current);
+        }
+        prev = current;
+        current = next;
+    }
+
+    points = std::move(new_points);
+}
+
 Polygon::Polygon(LinearRing outer_ring, std::vector<LinearRing> inner_rings)
     : outer_ring(outer_ring), inner_rings(inner_rings) {
     if (!this->outer_ring.isOuter()) {
@@ -91,6 +114,13 @@ double Polygon::area() const {
 
 bool Polygon::operator==(const Polygon& other) const {
     return outer_ring == other.outer_ring && inner_rings == other.inner_rings;
+}
+
+void Polygon::removeCollinearVertices() {
+    outer_ring.removeCollinearVertices();
+    for (LinearRing& inner_ring : inner_rings) {
+        inner_ring.removeCollinearVertices();
+    }
 }
 
 std::vector<Segment> toSegments(const std::vector<Polygon>& polygons) {

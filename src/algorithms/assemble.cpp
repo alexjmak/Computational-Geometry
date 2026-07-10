@@ -50,7 +50,9 @@ std::vector<LinearRing> assembleRings(const std::vector<Segment>& segments) {
         }
 
         const DCEL::HalfEdge& outer_edge = dcel.halfEdge(face.outer_component);
-        rings.push_back(dcel.ringOf(outer_edge));
+        LinearRing ring = dcel.ringOf(outer_edge);
+        ring.removeCollinearVertices();
+        rings.push_back(std::move(ring));
     }
 
     return rings;
@@ -74,6 +76,7 @@ std::vector<Polygon> assemblePolygons(const std::vector<Segment>& segments) {
             assert(face.outer_component != DCEL::npos);
             std::optional<Polygon> polygon = dcel.polygonOf(face);
             assert(polygon.has_value());
+            polygon->removeCollinearVertices();
             polygons.push_back(std::move(*polygon));
         }
     }

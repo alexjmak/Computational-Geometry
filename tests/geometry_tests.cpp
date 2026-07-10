@@ -184,6 +184,19 @@ TEST(PolygonTest, ReturnsOuterThenInnerRings) {
     EXPECT_EQ(*rings[1], hole);
 }
 
+TEST(PolygonTest, RemovesCollinearVerticesFromOuterAndInnerRings) {
+    const LinearRing outer({Point(0, 0), Point(2, 0), Point(4, 0), Point(4, 4), Point(0, 4)});
+    const LinearRing hole({Point(1, 1), Point(1, 3), Point(3, 3), Point(3, 2), Point(3, 1)});
+    Polygon polygon(outer, {hole});
+    polygon.removeCollinearVertices();
+
+    EXPECT_EQ(polygon.outer_ring,
+              LinearRing({Point(0, 0), Point(4, 0), Point(4, 4), Point(0, 4)}));
+    ASSERT_EQ(polygon.inner_rings.size(), 1);
+    EXPECT_EQ(polygon.inner_rings[0],
+              LinearRing({Point(1, 1), Point(1, 3), Point(3, 3), Point(3, 1)}));
+}
+
 TEST(PolygonTest, LocatesPointsWithHole) {
     const LinearRing outer({Point(0, 0), Point(5, 0), Point(5, 5), Point(0, 5)});
     const LinearRing hole({Point(1, 1), Point(1, 4), Point(4, 4), Point(4, 1)});
