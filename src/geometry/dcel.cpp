@@ -968,9 +968,11 @@ std::vector<DCEL::FaceParity> DCEL::faceParities() const {
         }
     }
 
+#ifndef NDEBUG
     for (const FaceParity face_parity : face_parities) {
         assert(face_parity != FaceParity::Unknown);
     }
+#endif
 
     return face_parities;
 }
