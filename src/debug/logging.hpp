@@ -34,7 +34,8 @@ namespace debug {
     X(dcel)                                                                                        \
     X(overlay)                                                                                     \
     X(segmentIntersection)                                                                         \
-    X(rayQuery)
+    X(rayQuery)                                                                                    \
+    X(triangulation)
 
 #ifdef NDEBUG
 #define X(category)                                                                                \

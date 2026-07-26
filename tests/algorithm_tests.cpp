@@ -3,10 +3,12 @@
 #include "algorithms/horizontal_ray_query.hpp"
 #include "algorithms/line_segment_intersection.hpp"
 #include "algorithms/overlay.hpp"
+#include "algorithms/triangulation.hpp"
 #include "geometry/polygon.hpp"
 #include <algorithm>
 #include <gtest/gtest.h>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -1739,4 +1741,88 @@ TEST(PolygonBooleanTest, ComputesTwoDonutBooleanAreas) {
     EXPECT_DOUBLE_EQ(totalPolygonArea(assemblePolygons(polygonOr(layer1, layer2))), 50.75);
     EXPECT_DOUBLE_EQ(totalPolygonArea(assemblePolygons(polygonDifference(layer1, layer2))), 21.75);
     EXPECT_DOUBLE_EQ(totalPolygonArea(assemblePolygons(polygonXor(layer1, layer2))), 43.5);
+}
+
+TEST(TriangulationTest, TriangulatesConvexQuadrilateral) {
+    const LinearRing square({Point(0, 0), Point(4, 0), Point(4, 4), Point(0, 4)});
+
+    const std::vector<LinearRing> triangles = earClippingTriangulation(square);
+
+    ASSERT_EQ(triangles.size(), 2);
+    EXPECT_DOUBLE_EQ(triangles[0].area() + triangles[1].area(), square.area());
+}
+
+TEST(TriangulationTest, ReturnsTriangleForTriangleInput) {
+    const LinearRing triangle({Point(0, 0), Point(4, 0), Point(1, 3)});
+
+    const std::vector<LinearRing> triangles = earClippingTriangulation(triangle);
+
+    ASSERT_EQ(triangles.size(), 1);
+    EXPECT_EQ(triangles[0].points.size(), 3);
+    EXPECT_TRUE(triangles[0].isOuter());
+    EXPECT_DOUBLE_EQ(triangles[0].area(), triangle.area());
+}
+
+TEST(TriangulationTest, RejectsRingsWithFewerThanTwoPoints) {
+    EXPECT_THROW(earClippingTriangulation(LinearRing(std::vector<Point>{})),
+                 std::invalid_argument);
+    EXPECT_THROW(earClippingTriangulation(LinearRing({Point(0, 0)})), std::invalid_argument);
+}
+
+TEST(TriangulationTest, TriangulatesConvexPentagon) {
+    const LinearRing pentagon(
+        {Point(0, 0), Point(5, 0), Point(6, 3), Point(3, 5), Point(0, 3)});
+
+    const std::vector<LinearRing> triangles = earClippingTriangulation(pentagon);
+
+    ASSERT_EQ(triangles.size(), 3);
+    double triangle_area = 0.0;
+    for (const LinearRing& triangle : triangles) {
+        EXPECT_TRUE(triangle.isOuter());
+        triangle_area += triangle.area();
+    }
+    EXPECT_DOUBLE_EQ(triangle_area, pentagon.area());
+}
+
+TEST(TriangulationTest, TriangulatesConcavePolygon) {
+    const LinearRing polygon(
+        {Point(0, 0), Point(4, 0), Point(4, 4), Point(2, 2), Point(0, 4)});
+
+    const std::vector<LinearRing> triangles = earClippingTriangulation(polygon);
+
+    ASSERT_EQ(triangles.size(), 3);
+    double triangle_area = 0.0;
+    for (const LinearRing& triangle : triangles) {
+        EXPECT_TRUE(triangle.isOuter());
+        triangle_area += triangle.area();
+    }
+    EXPECT_DOUBLE_EQ(triangle_area, polygon.area());
+}
+
+TEST(TriangulationTest, TriangulatesConcavePolygonWithMultipleEars) {
+    const LinearRing polygon({
+        Point(0, 0), Point(6, 0), Point(6, 6), Point(4, 6), Point(4, 2),
+        Point(2, 2), Point(2, 6), Point(0, 6),
+    });
+
+    const std::vector<LinearRing> triangles = earClippingTriangulation(polygon);
+
+    ASSERT_EQ(triangles.size(), 6);
+    double triangle_area = 0.0;
+    for (const LinearRing& triangle : triangles) {
+        EXPECT_TRUE(triangle.isOuter());
+        triangle_area += triangle.area();
+    }
+    EXPECT_DOUBLE_EQ(triangle_area, polygon.area());
+}
+
+TEST(TriangulationTest, TriangulatesRingAfterRemovingCollinearVertices) {
+    LinearRing ring({Point(0, 0), Point(2, 0), Point(4, 0), Point(4, 4), Point(0, 4)});
+    ring.removeCollinearVertices();
+
+    const std::vector<LinearRing> triangles = earClippingTriangulation(ring);
+
+    ASSERT_EQ(ring.points.size(), 4);
+    ASSERT_EQ(triangles.size(), 2);
+    EXPECT_DOUBLE_EQ(triangles[0].area() + triangles[1].area(), ring.area());
 }
