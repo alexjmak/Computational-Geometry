@@ -1916,6 +1916,48 @@ TEST(MonotonePartitionTest, PartitionsTextbookExample) {
     EXPECT_DOUBLE_EQ(partition_area, polygon.area());
 }
 
+TEST(MonotonePartitionTest, DISABLED_RejectsClockwiseRing) {
+    LinearRing polygon({
+        Point(10, 8),
+        Point(7, 6),
+        Point(7, 12),
+        Point(5, 10),
+        Point(4, 13),
+        Point(0, 9),
+        Point(2, 7),
+        Point(1, 4),
+        Point(-1, 5),
+        Point(-2, 1),
+        Point(0, -2),
+        Point(3, -1),
+        Point(6, -5),
+        Point(5, 3),
+        Point(8, 0),
+    });
+    polygon.reverse();
+
+    EXPECT_THROW(monotonePartition(polygon), std::invalid_argument);
+}
+
+TEST(MonotonePartitionTest, DISABLED_PreservesAreaWithHorizontalEdge) {
+    const LinearRing polygon({
+        Point(9, 5),
+        Point(6, 5),
+        Point(4, 14),
+        Point(-3, 7),
+        Point(-13, 9),
+        Point(12, -8),
+    });
+
+    const std::vector<LinearRing> partitions = monotonePartition(polygon);
+
+    double partition_area = 0.0;
+    for (const LinearRing& partition : partitions) {
+        partition_area += partition.area();
+    }
+    EXPECT_DOUBLE_EQ(partition_area, polygon.area());
+}
+
 TEST(TriangulationTest, TriangulatesRingAfterRemovingCollinearVertices) {
     LinearRing ring({Point(0, 0), Point(2, 0), Point(4, 0), Point(4, 4), Point(0, 4)});
     ring.removeCollinearVertices();
