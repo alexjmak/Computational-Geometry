@@ -101,4 +101,30 @@ bool ActiveSegmentCompare::operator()(SegmentId a_id, SegmentId b_id) const {
     return *point_at_y < *other_point_at_y;
 }
 
+std::optional<SegmentId>
+nearestActiveSegmentToLeft(const Point& point,
+                           const std::set<SegmentId, ActiveSegmentCompare>& active_segments,
+                           std::vector<ActiveSegment>& segments_by_id) {
+    const SegmentId dummy_segment_id = segments_by_id.size();
+    segments_by_id.emplace_back(dummy_segment_id, Segment(point, point));
+
+    // The dummy sorts at the query x-coordinate. Its predecessor is the nearest candidate to
+    // the left in the active set. Canonical tie ordering resolves shared-endpoint ties.
+    auto it = active_segments.lower_bound(dummy_segment_id);
+    std::optional<SegmentId> result;
+
+    while (it != active_segments.begin()) {
+        --it;
+        const ActiveSegment& candidate = segments_by_id[*it];
+        std::optional<Point> hit = candidate.pointAtEvent(point);
+        if (hit && hit->x < point.x) {
+            result = *it;
+            break;
+        }
+    }
+
+    segments_by_id.pop_back();
+    return result;
+}
+
 } // namespace sweep

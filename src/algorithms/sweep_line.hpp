@@ -5,6 +5,7 @@
 #include "geometry/vector.hpp"
 #include <cstddef>
 #include <optional>
+#include <set>
 #include <vector>
 
 namespace sweep {
@@ -91,6 +92,18 @@ struct ActiveSegmentCompare {
     /// \returns True if a_id should appear before b_id in the active set.
     bool operator()(SegmentId a_id, SegmentId b_id) const;
 };
+
+/// \brief Find the active segment nearest and strictly left of a point.
+///
+/// The active-segment comparator must be configured for \p point before calling this function.
+/// \param point The origin of the horizontal leftward ray.
+/// \param active_segments Active segment IDs ordered at \p point's sweep line.
+/// \param segments_by_id Segment geometry addressed by the active IDs.
+/// \returns The nearest active segment strictly left of \p point, or std::nullopt.
+std::optional<SegmentId>
+nearestActiveSegmentToLeft(const Point& point,
+                           const std::set<SegmentId, ActiveSegmentCompare>& active_segments,
+                           std::vector<ActiveSegment>& segments_by_id);
 
 } // namespace sweep
 

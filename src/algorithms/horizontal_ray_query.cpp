@@ -188,33 +188,12 @@ std::optional<SegmentId> handleEventPoint(EventPoint& ls_point, RayQueryEvent& e
         }
     }
 
-    std::optional<SegmentId> result;
-    bool is_query_pt = !event.query_ids.empty();
-    if (is_query_pt) {
-        const SegmentId dummy_segment_id = segments_by_id.size();
-        line_sweep.segments_by_id.emplace_back(dummy_segment_id,
-                                               Segment(ls_point.point, ls_point.point));
-
-        // The dummy sorts at the query x-coordinate. Its predecessor is the nearest candidate to
-        // the left in the active set. ActiveSegmentCompare uses canonical tie ordering here, which
-        // resolves shared endpoint ties so lower and upper endpoint cases pick the closest edge.
-        auto it = curr_segments.lower_bound(dummy_segment_id);
-
-        while (it != curr_segments.begin()) {
-            --it;
-            const ActiveSegment& candidate = segments_by_id[*it];
-
-            std::optional<Point> hit = candidate.pointAtEvent(ls_point.point);
-            // Candidates are never horizontal because they are filtered out in populateEventQueue.
-            if (hit && hit->x < ls_point.point.x) {
-                result = *it;
-                break;
-            }
-        }
-        line_sweep.segments_by_id.pop_back();
+    if (event.query_ids.empty()) {
+        return std::nullopt;
     }
 
-    return result;
+    return sweep::nearestActiveSegmentToLeft(ls_point.point, curr_segments,
+                                             line_sweep.segments_by_id);
 }
 } // namespace
 

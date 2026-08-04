@@ -131,7 +131,7 @@ PY
 ```
 
 Other exposed algorithms include `convex_hull`, `assemble_rings`,
-`assemble_polygons`, `planarize_segments`, `segment_overlay`, `polygon_or`,
+`assemble_polygons`, `monotone_partition`, `planarize_segments`, `segment_overlay`, `polygon_or`,
 `polygon_difference`, and `polygon_xor`.
 
 ## Showcase Scripts
@@ -142,6 +142,7 @@ documents and plots:
 - `showcase_geometry_primitives.py`
 - `showcase_segment_intersections.py`
 - `showcase_convex_hull.py`
+- `showcase_monotone_partition.py`
 - `showcase_assemble_rings.py`
 - `showcase_assemble_polygons.py`
 - `showcase_overlay.py`

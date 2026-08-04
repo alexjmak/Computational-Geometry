@@ -71,6 +71,7 @@ add_library(
     src/algorithms/convex_hull.cpp
     src/algorithms/horizontal_ray_query.cpp
     src/algorithms/line_segment_intersection.cpp
+    src/algorithms/monotone_partition.cpp
     src/algorithms/overlay.cpp
     src/algorithms/sweep_line.cpp
     src/algorithms/triangulation.cpp

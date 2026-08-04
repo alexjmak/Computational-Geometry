@@ -2,6 +2,7 @@
 #include "algorithms/convex_hull.hpp"
 #include "algorithms/horizontal_ray_query.hpp"
 #include "algorithms/line_segment_intersection.hpp"
+#include "algorithms/monotone_partition.hpp"
 #include "algorithms/overlay.hpp"
 #include "algorithms/triangulation.hpp"
 #include "geometry/polygon.hpp"
@@ -1764,14 +1765,12 @@ TEST(TriangulationTest, ReturnsTriangleForTriangleInput) {
 }
 
 TEST(TriangulationTest, RejectsRingsWithFewerThanTwoPoints) {
-    EXPECT_THROW(earClippingTriangulation(LinearRing(std::vector<Point>{})),
-                 std::invalid_argument);
+    EXPECT_THROW(earClippingTriangulation(LinearRing(std::vector<Point>{})), std::invalid_argument);
     EXPECT_THROW(earClippingTriangulation(LinearRing({Point(0, 0)})), std::invalid_argument);
 }
 
 TEST(TriangulationTest, TriangulatesConvexPentagon) {
-    const LinearRing pentagon(
-        {Point(0, 0), Point(5, 0), Point(6, 3), Point(3, 5), Point(0, 3)});
+    const LinearRing pentagon({Point(0, 0), Point(5, 0), Point(6, 3), Point(3, 5), Point(0, 3)});
 
     const std::vector<LinearRing> triangles = earClippingTriangulation(pentagon);
 
@@ -1785,8 +1784,7 @@ TEST(TriangulationTest, TriangulatesConvexPentagon) {
 }
 
 TEST(TriangulationTest, TriangulatesConcavePolygon) {
-    const LinearRing polygon(
-        {Point(0, 0), Point(4, 0), Point(4, 4), Point(2, 2), Point(0, 4)});
+    const LinearRing polygon({Point(0, 0), Point(4, 0), Point(4, 4), Point(2, 2), Point(0, 4)});
 
     const std::vector<LinearRing> triangles = earClippingTriangulation(polygon);
 
@@ -1801,8 +1799,14 @@ TEST(TriangulationTest, TriangulatesConcavePolygon) {
 
 TEST(TriangulationTest, TriangulatesConcavePolygonWithMultipleEars) {
     const LinearRing polygon({
-        Point(0, 0), Point(6, 0), Point(6, 6), Point(4, 6), Point(4, 2),
-        Point(2, 2), Point(2, 6), Point(0, 6),
+        Point(0, 0),
+        Point(6, 0),
+        Point(6, 6),
+        Point(4, 6),
+        Point(4, 2),
+        Point(2, 2),
+        Point(2, 6),
+        Point(0, 6),
     });
 
     const std::vector<LinearRing> triangles = earClippingTriangulation(polygon);
@@ -1814,6 +1818,102 @@ TEST(TriangulationTest, TriangulatesConcavePolygonWithMultipleEars) {
         triangle_area += triangle.area();
     }
     EXPECT_DOUBLE_EQ(triangle_area, polygon.area());
+}
+
+TEST(TriangulationTest, TriangulatesVertexClassificationExample) {
+    // Counter-clockwise version of the start/end/split/merge-vertex example. The vertices are
+    // deliberately assigned distinct y coordinates so sweep-event ordering is unambiguous.
+    const LinearRing polygon({
+        Point(10, 5),
+        Point(8, 6),
+        Point(8, 11),
+        Point(6, 10),
+        Point(4, 12),
+        Point(0, 9),
+        Point(2, 7),
+        Point(1, 4),
+        Point(-1, 6),
+        Point(-2, 1),
+        Point(0, -2),
+        Point(3, -1),
+        Point(5, -2),
+        Point(4, 4),
+        Point(10, 2),
+    });
+
+    const std::vector<LinearRing> triangles = earClippingTriangulation(polygon);
+
+    ASSERT_EQ(triangles.size(), polygon.points.size() - 2);
+    double triangle_area = 0.0;
+    for (const LinearRing& triangle : triangles) {
+        EXPECT_TRUE(triangle.isOuter());
+        triangle_area += triangle.area();
+    }
+    EXPECT_DOUBLE_EQ(triangle_area, polygon.area());
+}
+
+TEST(MonotonePartitionTest, PartitionsVertexClassificationExample) {
+    // Counter-clockwise version of the start/end/split/merge-vertex example. The vertices are
+    // deliberately assigned distinct y coordinates so sweep-event ordering is unambiguous.
+    const LinearRing polygon({
+        Point(10, 5),
+        Point(8, 6),
+        Point(8, 11),
+        Point(6, 10),
+        Point(4, 12),
+        Point(0, 9),
+        Point(2, 7),
+        Point(1, 4),
+        Point(-1, 6),
+        Point(-2, 1),
+        Point(0, -2),
+        Point(3, -1),
+        Point(5, -2),
+        Point(4, 4),
+        Point(10, 2),
+    });
+
+    const std::vector<LinearRing> partitions = monotonePartition(polygon);
+
+    ASSERT_EQ(partitions.size(), 4);
+    double partition_area = 0.0;
+    for (const LinearRing& partition : partitions) {
+        EXPECT_TRUE(partition.isOuter());
+        partition_area += partition.area();
+    }
+    EXPECT_DOUBLE_EQ(partition_area, polygon.area());
+}
+
+TEST(MonotonePartitionTest, PartitionsTextbookExample) {
+    // Counter-clockwise integer embedding of the pictured v1--v15 boundary. Interior diagonals
+    // from the illustration are intentionally omitted; monotonePartition must create them.
+    const LinearRing polygon({
+        Point(10, 8),
+        Point(7, 6),
+        Point(7, 12),
+        Point(5, 10),
+        Point(4, 13),
+        Point(0, 9),
+        Point(2, 7),
+        Point(1, 4),
+        Point(-1, 5),
+        Point(-2, 1),
+        Point(0, -2),
+        Point(3, -1),
+        Point(6, -5),
+        Point(5, 3),
+        Point(8, 0),
+    });
+
+    const std::vector<LinearRing> partitions = monotonePartition(polygon);
+
+    ASSERT_FALSE(partitions.empty());
+    double partition_area = 0.0;
+    for (const LinearRing& partition : partitions) {
+        EXPECT_TRUE(partition.isOuter());
+        partition_area += partition.area();
+    }
+    EXPECT_DOUBLE_EQ(partition_area, polygon.area());
 }
 
 TEST(TriangulationTest, TriangulatesRingAfterRemovingCollinearVertices) {
