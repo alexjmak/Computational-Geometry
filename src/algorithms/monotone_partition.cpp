@@ -4,6 +4,7 @@
 #include "geometry/polygon.hpp"
 #include "geometry/predicates.hpp"
 #include "geometry/vector.hpp"
+#include <cassert>
 #include <map>
 #include <optional>
 #include <set>
@@ -245,4 +246,40 @@ std::vector<LinearRing> monotonePartition(LinearRing ring) {
     }
 
     return assembleRings(monotone_segments);
+}
+
+std::vector<MonotoneChain> extractMonotoneChains(const LinearRing& monotone_ring) {
+    std::vector<MonotoneChain> chains(monotone_ring.points.size(), MonotoneChain::Right);
+    if (monotone_ring.points.size() < 3) {
+        return chains;
+    }
+
+    EventPoint top_point = EventPoint(monotone_ring.points[0]);
+    std::size_t top_index = 0;
+    EventPoint bottom_point = top_point;
+    std::size_t bottom_index = 0;
+    for (std::size_t i = 1; i < monotone_ring.points.size(); ++i) {
+        EventPoint curr_point = EventPoint(monotone_ring.points[i]);
+        if (curr_point < top_point) {
+            top_point = curr_point;
+            top_index = i;
+        }
+        if (bottom_point < curr_point) {
+            bottom_point = curr_point;
+            bottom_index = i;
+        }
+    }
+
+    // In a counter-clockwise ring, advancing from the top vertex traces the left chain down to
+    // the bottom vertex. The top is labeled Right and the bottom is labeled Left so every vertex
+    // has exactly one chain label.
+    const std::size_t n = monotone_ring.points.size();
+    for (std::size_t i = (top_index + 1) % n;; i = (i + 1) % n) {
+        chains[i] = MonotoneChain::Left;
+        if (i == bottom_index) {
+            break;
+        }
+    }
+
+    return chains;
 }

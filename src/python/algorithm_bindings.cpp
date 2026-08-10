@@ -3,6 +3,7 @@
 #include "algorithms/line_segment_intersection.hpp"
 #include "algorithms/monotone_partition.hpp"
 #include "algorithms/overlay.hpp"
+#include "algorithms/triangulation.hpp"
 #include "geometry/random.hpp"
 #include "python/bindings.hpp"
 #include <algorithm>
@@ -75,6 +76,7 @@ void bindAlgorithms(py::module_& module) {
     module.def("line_segment_intersection", &lineSegmentIntersectionPython, py::arg("segments"),
                py::arg("algorithm") = "line-sweep");
     module.def("monotone_partition", &monotonePartition, py::arg("ring"));
+    module.def("triangulate", &triangulate, py::arg("ring"));
     module.def("random_points", &randomPointsPython, py::arg("count"), py::arg("seed") = py::none(),
                py::arg("min_coord") = 10, py::arg("max_coord") = 100);
     module.def("random_segments", &randomSegmentsPython, py::arg("count"),

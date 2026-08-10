@@ -1820,6 +1820,47 @@ TEST(TriangulationTest, TriangulatesConcavePolygonWithMultipleEars) {
     EXPECT_DOUBLE_EQ(triangle_area, polygon.area());
 }
 
+TEST(MonotoneTriangulationTest, ReturnsTriangleForTriangleInput) {
+    const LinearRing ring({Point(0, 0), Point(3, 0), Point(1, 3)});
+
+    const std::vector<LinearRing> triangles = triangulateMonotonePolygon(ring);
+
+    ASSERT_EQ(triangles.size(), 1);
+    EXPECT_EQ(triangles.front().points.size(), 3);
+    EXPECT_TRUE(triangles.front().isOuter());
+    EXPECT_DOUBLE_EQ(triangles.front().area(), ring.area());
+}
+
+TEST(MonotoneTriangulationTest, ReturnsEmptyForFewerThanThreeVertices) {
+    EXPECT_TRUE(triangulateMonotonePolygon(LinearRing(std::vector<Point>{})).empty());
+    EXPECT_TRUE(triangulateMonotonePolygon(LinearRing({Point(0, 0)})).empty());
+    EXPECT_TRUE(
+        triangulateMonotonePolygon(LinearRing({Point(0, 0), Point(1, 1)})).empty());
+}
+
+TEST(MonotoneTriangulationTest, TriangulatesConcaveYMonotonePolygon) {
+    const LinearRing ring({
+        Point(0, 0),
+        Point(3, 2),
+        Point(2, 4),
+        Point(0, 6),
+        Point(-3, 4),
+        Point(-1, 3),
+        Point(-3, 2),
+    });
+
+    const std::vector<LinearRing> triangles = triangulateMonotonePolygon(ring);
+
+    ASSERT_EQ(triangles.size(), ring.points.size() - 2);
+    double triangulated_area = 0.0;
+    for (const LinearRing& triangle : triangles) {
+        EXPECT_EQ(triangle.points.size(), 3);
+        EXPECT_TRUE(triangle.isOuter());
+        triangulated_area += triangle.area();
+    }
+    EXPECT_DOUBLE_EQ(triangulated_area, ring.area());
+}
+
 TEST(TriangulationTest, TriangulatesVertexClassificationExample) {
     // Counter-clockwise version of the start/end/split/merge-vertex example. The vertices are
     // deliberately assigned distinct y coordinates so sweep-event ordering is unambiguous.
@@ -1882,6 +1923,34 @@ TEST(MonotonePartitionTest, PartitionsVertexClassificationExample) {
         partition_area += partition.area();
     }
     EXPECT_DOUBLE_EQ(partition_area, polygon.area());
+}
+
+TEST(MonotoneChainsTest, ClassifiesVerticesAcrossRingBoundary) {
+    // Counter-clockwise diamond with the bottom vertex at index zero. Classifying the left chain
+    // therefore exercises the wrap from the final index back to the first index.
+    const LinearRing ring({
+        Point(0, 0),
+        Point(2, 2),
+        Point(0, 4),
+        Point(-2, 2),
+    });
+
+    const std::vector<MonotoneChain> chains = extractMonotoneChains(ring);
+
+    const std::vector<MonotoneChain> expected_chains({
+        MonotoneChain::Left,
+        MonotoneChain::Right,
+        MonotoneChain::Right,
+        MonotoneChain::Left,
+    });
+    EXPECT_EQ(chains, expected_chains);
+}
+
+TEST(MonotoneChainsTest, KeepsVertexAlignedLabelsForFewerThanThreeVertices) {
+    const std::vector<MonotoneChain> chains =
+        extractMonotoneChains(LinearRing({Point(0, 1), Point(0, 0)}));
+
+    EXPECT_EQ(chains, std::vector<MonotoneChain>({MonotoneChain::Right, MonotoneChain::Right}));
 }
 
 TEST(MonotonePartitionTest, PartitionsTextbookExample) {

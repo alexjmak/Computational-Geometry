@@ -11,4 +11,14 @@
 /// \throws std::invalid_argument If the ring contains fewer than two points.
 std::vector<LinearRing> earClippingTriangulation(const LinearRing& ring);
 
+/// \brief Triangulate a simple counter-clockwise y-monotone ring.
+/// \param monotone_ring The y-monotone ring to triangulate.
+/// \returns Counter-clockwise triangles covering the same area as the input ring.
+std::vector<LinearRing> triangulateMonotonePolygon(const LinearRing& monotone_ring);
+
+/// \brief Partition and triangulate a simple counter-clockwise ring.
+/// \param ring The simple ring to triangulate.
+/// \returns Counter-clockwise triangles covering the same area as the input ring.
+std::vector<LinearRing> triangulate(const LinearRing& ring);
+
 #endif // TRIANGULATION_HPP
