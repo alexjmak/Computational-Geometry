@@ -58,15 +58,15 @@ python3 -m pip install pybind11-stubgen
 Configure and build a debug tree:
 
 ```bash
-cmake -S . -B build-debug -G Ninja -DCMAKE_BUILD_TYPE=Debug
-cmake --build build-debug
+cmake -S . -B build/debug -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build/debug
 ```
 
 For a release build, use a separate build directory:
 
 ```bash
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build
+cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build/release
 ```
 
 The build produces:
@@ -80,7 +80,7 @@ The build produces:
 Run the CTest suite from the debug build:
 
 ```bash
-QT_QPA_PLATFORM=offscreen ctest --test-dir build-debug --output-on-failure
+QT_QPA_PLATFORM=offscreen ctest --test-dir build/debug --output-on-failure
 ```
 
 The `QT_QPA_PLATFORM=offscreen` environment variable lets GUI tests run in a
@@ -93,7 +93,7 @@ CI runs Debug and Release builds on Ubuntu and executes the CTest suite.
 Set `PYTHONPATH` to the build directory so Python can import the compiled module:
 
 ```bash
-PYTHONPATH=build-debug python3 - <<'PY'
+PYTHONPATH=build/debug python3 - <<'PY'
 import cgeom as cg
 
 segments = cg.random_segments(count=100, seed=0)
@@ -116,7 +116,7 @@ Polygon boolean operations return boundary segments. Feed those segments into
 `assemble_polygons` to recover polygon objects:
 
 ```bash
-PYTHONPATH=build-debug python3 - <<'PY'
+PYTHONPATH=build/debug python3 - <<'PY'
 import cgeom as cg
 
 left = cg.Rectangle(cg.Point(0, 0), cg.Point(5, 5)).ring().segments()
@@ -154,7 +154,7 @@ documents and plots:
 Run one with the build directory on `PYTHONPATH`:
 
 ```bash
-PYTHONPATH=build-debug python3 scripts/showcase_polygon_and.py
+PYTHONPATH=build/debug python3 scripts/showcase_polygon_and.py
 ```
 
 ## YAML Format
@@ -194,8 +194,8 @@ Build the project, then run the Qt viewer. Use File > Open to choose a YAML
 document, or pass one on the command line:
 
 ```bash
-./build-debug/cgeom-gui
-./build-debug/cgeom-gui output.yaml
+./build/debug/cgeom-gui
+./build/debug/cgeom-gui output.yaml
 ```
 
 ## Documentation
@@ -203,7 +203,7 @@ document, or pass one on the command line:
 If Doxygen is installed, generate local HTML documentation with:
 
 ```bash
-cmake --build build-debug --target docs
+cmake --build build/debug --target docs
 ```
 
 Generated documentation is written under `docs/`, which is ignored by Git.
