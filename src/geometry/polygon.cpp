@@ -1,30 +1,31 @@
 #include "geometry/polygon.hpp"
 #include "geometry/intersection.hpp"
 #include "geometry/predicates.hpp"
-#include <cmath>
 #include <stdexcept>
 
-double Ring::area() const {
-    return std::abs(signedArea());
+Rational Ring::area() const {
+    const Rational signed_area = signedArea();
+    return signed_area < 0 ? -signed_area : signed_area;
 }
 
 bool Ring::isOuter() const {
-    return signedArea() > 0.0;
+    return signedArea() > 0;
 }
 
 LinearRing::LinearRing(std::vector<Point> points) : points(std::move(points)) {}
 
-double LinearRing::signedArea() const {
+Rational LinearRing::signedArea() const {
     if (points.size() < 3) {
-        return 0.0;
+        return 0;
     }
-    double ret = 0.0;
+
+    Rational area_doubled = 0;
     Point prev = points.back();
     for (const auto& point : points) {
-        ret += boost::rational_cast<double>(crossProduct(prev, point));
+        area_doubled += crossProduct(prev, point);
         prev = point;
     }
-    return 0.5 * ret;
+    return area_doubled / 2;
 }
 
 std::vector<Segment> LinearRing::segments() const {
@@ -104,8 +105,8 @@ std::vector<const LinearRing*> Polygon::rings() const {
     return ret;
 }
 
-double Polygon::area() const {
-    double ret = outer_ring.signedArea();
+Rational Polygon::area() const {
+    Rational ret = outer_ring.signedArea();
     for (const LinearRing& inner_ring : inner_rings) {
         ret += inner_ring.signedArea();
     }
@@ -172,10 +173,10 @@ bool Rectangle::contains(const Polygon& polygon) const {
     return true;
 }
 
-double Rectangle::area() const {
+Rational Rectangle::area() const {
     Rational width = upper_right.x - lower_left.x;
     Rational height = upper_right.y - lower_left.y;
-    return boost::rational_cast<double>(width * height);
+    return width * height;
 }
 
 PointContainment locatePoint(const LinearRing& ring, const Point& point) {

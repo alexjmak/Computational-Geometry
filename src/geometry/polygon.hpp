@@ -16,11 +16,11 @@ class Ring {
     /// \brief Compute the signed area of the ring.
     /// \returns The signed area. Positive values indicate counter-clockwise point order,
     /// and negative values indicate clockwise point order.
-    virtual double signedArea() const = 0;
+    virtual Rational signedArea() const = 0;
 
     /// \brief Compute the unsigned area of the ring.
     /// \returns The absolute area enclosed by the ring.
-    double area() const;
+    Rational area() const;
 
     /// \brief Check whether the ring is oriented counter-clockwise.
     /// \returns True if the ring has positive signed area, otherwise false.
@@ -48,7 +48,7 @@ class LinearRing final : public Ring {
     /// \brief Compute the signed area of the ring.
     /// \returns The signed area. Positive values indicate counter-clockwise point order,
     /// and negative values indicate clockwise point order.
-    double signedArea() const override;
+    Rational signedArea() const override;
 
     /// \brief Convert the ring into its directed boundary segments.
     /// \returns A list of segments connecting consecutive points in the ring.
@@ -81,7 +81,7 @@ class Polygon {
 
     /// \brief Compute the signed area contributed by all polygon rings.
     /// \returns The sum of the signed areas of the polygon's rings.
-    double area() const;
+    Rational area() const;
 
     /// \brief Check whether two polygons contain the same ordered rings.
     /// \param other The polygon to compare against.
@@ -134,7 +134,7 @@ class Rectangle {
 
     /// \brief Compute the area of the rectangle.
     /// \returns The rectangle area.
-    double area() const;
+    Rational area() const;
 };
 
 /// \brief Classification of a point relative to a ring or polygon.

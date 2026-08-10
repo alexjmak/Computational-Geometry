@@ -127,14 +127,22 @@ TEST(LinearRingTest, ComputesSignedAreaOrientationAndSegments) {
     const LinearRing outer({Point(0, 0), Point(2, 0), Point(2, 2), Point(0, 2)});
     const LinearRing inner({Point(0, 0), Point(0, 2), Point(2, 2), Point(2, 0)});
 
-    EXPECT_DOUBLE_EQ(outer.signedArea(), 4.0);
-    EXPECT_DOUBLE_EQ(inner.signedArea(), -4.0);
+    EXPECT_EQ(outer.signedArea(), 4);
+    EXPECT_EQ(inner.signedArea(), -4);
     EXPECT_TRUE(outer.isOuter());
     EXPECT_FALSE(inner.isOuter());
     EXPECT_EQ(outer.segments(),
               std::vector<Segment>(
                   {Segment(Point(0, 2), Point(0, 0)), Segment(Point(0, 0), Point(2, 0)),
                    Segment(Point(2, 0), Point(2, 2)), Segment(Point(2, 2), Point(0, 2))}));
+}
+
+TEST(LinearRingTest, ComputesExactRationalArea) {
+    const LinearRing triangle(
+        {Point(0, 0), Point(Rational(1, 2), 0), Point(0, 1)});
+
+    EXPECT_EQ(triangle.signedArea(), Rational(1, 4));
+    EXPECT_EQ(triangle.area(), Rational(1, 4));
 }
 
 TEST(LinearRingTest, LocatesPointsInsideOnBoundaryAndOutside) {
@@ -493,7 +501,7 @@ TEST(DCELTest, IgnoresInteriorChordWhenClassifyingSquareParity) {
     EXPECT_EQ(face_parities[DCEL::unbounded_face_index], DCEL::FaceParity::Exterior);
 
     std::size_t interior_faces = 0;
-    double interior_area = 0.0;
+    Rational interior_area = 0;
     for (std::size_t i = 0; i < dcel.faceCount(); ++i) {
         if (face_parities[i] != DCEL::FaceParity::Interior) {
             continue;
@@ -506,7 +514,7 @@ TEST(DCELTest, IgnoresInteriorChordWhenClassifyingSquareParity) {
     }
 
     EXPECT_EQ(interior_faces, 2);
-    EXPECT_DOUBLE_EQ(interior_area, 16.0);
+    EXPECT_EQ(interior_area, 16);
 }
 
 TEST(DCELTest, IgnoresCrossingInteriorChordsWhenClassifyingSquareParity) {
@@ -523,7 +531,7 @@ TEST(DCELTest, IgnoresCrossingInteriorChordsWhenClassifyingSquareParity) {
     EXPECT_EQ(face_parities[DCEL::unbounded_face_index], DCEL::FaceParity::Exterior);
 
     std::size_t interior_faces = 0;
-    double interior_area = 0.0;
+    Rational interior_area = 0;
     for (std::size_t i = 0; i < dcel.faceCount(); ++i) {
         if (face_parities[i] != DCEL::FaceParity::Interior) {
             continue;
@@ -536,7 +544,7 @@ TEST(DCELTest, IgnoresCrossingInteriorChordsWhenClassifyingSquareParity) {
     }
 
     EXPECT_EQ(interior_faces, 4);
-    EXPECT_DOUBLE_EQ(interior_area, 16.0);
+    EXPECT_EQ(interior_area, 16);
 }
 
 TEST(DCELTest, IgnoresDanglingChainAttachedToSquare) {
@@ -566,7 +574,7 @@ TEST(DCELTest, IgnoresDanglingChainAttachedToSquare) {
         EXPECT_TRUE(face.inner_components.empty());
         const std::optional<Polygon> polygon = dcel.polygonOf(face);
         ASSERT_TRUE(polygon.has_value());
-        EXPECT_DOUBLE_EQ(polygon->area(), 1.0);
+        EXPECT_EQ(polygon->area(), 1);
     }
 
     EXPECT_EQ(bounded_faces, 1);
@@ -596,7 +604,7 @@ TEST(DCELTest, HandlesThreeRectanglesTouchingAtPoints) {
         EXPECT_TRUE(face.inner_components.empty());
         const std::optional<Polygon> polygon = dcel.polygonOf(face);
         ASSERT_TRUE(polygon.has_value());
-        EXPECT_DOUBLE_EQ(polygon->area(), 1.0);
+        EXPECT_EQ(polygon->area(), 1);
     }
 
     EXPECT_EQ(bounded_faces, 3);
